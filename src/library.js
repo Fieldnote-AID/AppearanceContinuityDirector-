@@ -8,6 +8,9 @@
     managedMarker: "[appearance-director:managed]",
 
     trackTitlePrefixes: ["Character - ", "NPC - "],
+    trackTypeAllowlist: ["character"],
+    discoveryMarkers: ["[track-appearance]", "[appearance]"],
+
     createEmptyCards: false,
     pinCards: false,
 
@@ -111,7 +114,7 @@
       state[APPEARANCE_CONFIG.stateKey] = {
         tracked: {},
         processedTextHash: "",
-        cardCount: -1
+        cardSignature: ""
       };
     }
     return state[APPEARANCE_CONFIG.stateKey];
@@ -121,6 +124,20 @@
     if (!card || typeof card !== "object") return "";
     if (typeof card.entry === "string") return card.entry;
     if (typeof card.value === "string") return card.value;
+    return "";
+  }
+
+  function getCardTitle(card) {
+    if (!card || typeof card !== "object") return "";
+    if (typeof card.title === "string") return card.title;
+    if (typeof card.name === "string") return card.name;
+    return "";
+  }
+
+  function getCardKeys(card) {
+    if (!card || typeof card !== "object") return "";
+    if (typeof card.keys === "string") return card.keys;
+    if (typeof card.triggers === "string") return card.triggers;
     return "";
   }
 
@@ -286,12 +303,12 @@
     var wordCount;
 
     if (!value) return false;
-    if (value.length > 40) return false;
+    if (value.length > 60) return false;
     if (looksGenericAlias(value)) return false;
     if (!/^[A-Za-z0-9][A-Za-z0-9'’\- ]*[A-Za-z0-9]$/.test(value)) return false;
 
     wordCount = value.split(/\s+/).length;
-    return wordCount >= 1 && wordCount <= 4;
+    return wordCount >= 1 && wordCount <= 6;
   }
 
   function parseKeyAliases(keys) {
@@ -304,8 +321,21 @@
       });
   }
 
+  function cardHasDiscoveryMarker(card) {
+    var description = lower(card && card.description);
+    var entry = lower(getCardText(card));
+    var i, marker;
+
+    for (i = 0; i < APPEARANCE_CONFIG.discoveryMarkers.length; i++) {
+      marker = lower(APPEARANCE_CONFIG.discoveryMarkers[i]);
+      if (description.indexOf(marker) !== -1 || entry.indexOf(marker) !== -1) return true;
+    }
+
+    return false;
+  }
+
   function isManagedAppearanceCard(card) {
-    var title = lower(card && card.title);
+    var title = lower(getCardTitle(card));
     var description = lower(card && card.description);
     var entry = lower(getCardText(card));
 
@@ -315,11 +345,12 @@
   }
 
   function isTrackableCharacterCard(card) {
-    var title, stripped, i;
+    var title, stripped, type, i;
 
     if (!card || isManagedAppearanceCard(card)) return false;
 
-    title = normalizeSpace(card.title);
+    title = normalizeSpace(getCardTitle(card));
+    type = lower(card && card.type);
     if (!title) return false;
 
     for (i = 0; i < APPEARANCE_CONFIG.trackTitlePrefixes.length; i++) {
@@ -329,12 +360,27 @@
       }
     }
 
+    if (APPEARANCE_CONFIG.trackTypeAllowlist.indexOf(type) !== -1 && looksLikeName(title)) {
+      return true;
+    }
+
+    if (cardHasDiscoveryMarker(card) && looksLikeName(title)) {
+      return true;
+    }
+
     return false;
   }
 
   function buildMetaFromCharacterCard(card) {
-    var displayName = stripPrefix(card.title);
-    var aliases = dedupeList([displayName].concat(parseKeyAliases(card.keys)), 6).filter(function(alias) {
+    var sourceTitle = normalizeSpace(getCardTitle(card));
+    var displayName = stripPrefix(sourceTitle);
+    var aliases;
+    var keyAliases;
+
+    if (!displayName) displayName = sourceTitle;
+
+    keyAliases = parseKeyAliases(getCardKeys(card));
+    aliases = dedupeList([displayName].concat(keyAliases), 8).filter(function(alias) {
       return !looksGenericAlias(alias);
     });
 
@@ -346,7 +392,7 @@
       aliases: aliases,
       cardTitle: APPEARANCE_CONFIG.managedTitlePrefix + displayName,
       cardKeys: aliases.join(", "),
-      sourceCardTitle: normalizeSpace(card.title)
+      sourceCardTitle: sourceTitle
     };
   }
 
@@ -366,14 +412,35 @@
     return root.tracked[id] || null;
   }
 
+  function buildTrackedRegistrySignature() {
+    var cards = ensureCardsArray();
+    var parts = [];
+    var i, card;
+
+    for (i = 0; i < cards.length; i++) {
+      card = cards[i];
+      if (!card || isManagedAppearanceCard(card)) continue;
+      parts.push([
+        normalizeSpace(getCardTitle(card)),
+        normalizeSpace(card && card.type),
+        normalizeSpace(getCardKeys(card)),
+        normalizeSpace(getCardText(card)),
+        normalizeSpace(card && card.description)
+      ].join("|"));
+    }
+
+    return simpleHash(parts.join("\n"));
+  }
+
   function refreshTrackedRegistry(force) {
     var root = ensureState();
     var cards = ensureCardsArray();
     var nextTracked = {};
+    var signature = buildTrackedRegistrySignature();
     var i, card, meta, existing;
 
-    if (!force && root.cardCount === cards.length) return false;
-    root.cardCount = cards.length;
+    if (!force && root.cardSignature === signature) return false;
+    root.cardSignature = signature;
 
     for (i = 0; i < cards.length; i++) {
       card = cards[i];
@@ -420,6 +487,7 @@
       if (lower(meta.id) === target) return meta;
       if (lower(meta.name) === target) return meta;
       if (lower(meta.cardTitle) === target) return meta;
+      if (lower(meta.sourceCardTitle) === target) return meta;
 
       for (i = 0; i < (meta.aliases || []).length; i++) {
         if (lower(meta.aliases[i]) === target) return meta;
@@ -634,7 +702,7 @@
     var i;
 
     for (i = 0; i < cards.length; i++) {
-      if (lower(cards[i] && cards[i].title) === target) return cards[i];
+      if (lower(getCardTitle(cards[i])) === target) return cards[i];
     }
 
     return null;
@@ -646,7 +714,7 @@
     var i;
 
     for (i = cards.length - 1; i >= 0; i--) {
-      if (lower(cards[i] && cards[i].title) === target) cards.splice(i, 1);
+      if (lower(getCardTitle(cards[i])) === target) cards.splice(i, 1);
     }
   }
 
@@ -665,7 +733,9 @@
     if (!card) {
       card = {
         title: "%@%",
+        name: "%@%",
         keys: "",
+        triggers: "",
         entry: "",
         description: "",
         type: APPEARANCE_CONFIG.cardType
@@ -675,7 +745,9 @@
 
     card.type = APPEARANCE_CONFIG.cardType;
     card.title = meta.cardTitle;
+    card.name = meta.cardTitle;
     card.keys = meta.cardKeys;
+    card.triggers = meta.cardKeys;
     card.entry = entry;
     card.description = APPEARANCE_CONFIG.managedMarker;
 
@@ -696,13 +768,14 @@
     var details = compactList(appearance.details, 1, 24);
     var recent = compactList(appearance.recent, 1, 32);
     var sections = [];
+    var entry;
 
     if (outfit.length) sections.push("- Outfit: " + outfit.join("; ") + ".");
     if (condition.length) sections.push("- Condition: " + condition.join("; ") + ".");
     if (details.length) sections.push("- Details: " + details.join("; ") + ".");
     if (APPEARANCE_CONFIG.includeRecent && recent.length) sections.push("- Recent: " + recent[0] + ".");
 
-    var entry = sections.join("\n");
+    entry = sections.join("\n");
     if (!entry) entry = "- Appearance: no tracked changes yet.";
 
     if (entry.length > APPEARANCE_CONFIG.maxCardChars) {
@@ -945,7 +1018,7 @@
       }
       root.tracked = {};
       root.processedTextHash = "";
-      root.cardCount = -1;
+      root.cardSignature = "";
       return true;
     }
 
@@ -1020,6 +1093,11 @@
     match = text.match(/^\/resetappearance\s+(.+)$/i);
     if (match) {
       return resetCharacter(normalizeSpace(match[1]));
+    }
+
+    match = text.match(/^\/rescanappearance$/i);
+    if (match) {
+      return refreshTrackedRegistry(true);
     }
 
     return false;
