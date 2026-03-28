@@ -87,26 +87,6 @@ Uses its own state storage and does not interfere with quest progression cards o
 
 * * *
 
-## How It Works
-
-Appearance Continuity Director runs during the output phase.
-
-Each turn, it:
-
-1. reads the latest AI-generated text
-2. checks whether configured characters are explicitly mentioned
-3. scans those segments for appearance signals
-4. sorts identified changes into:
-   * outfit
-   * condition
-   * visible details
-5. updates the tracked state for that character
-6. refreshes that character’s appearance Story Card only if something changed
-
-This means the AI keeps seeing current appearance continuity without you manually editing cards every scene.
-
-* * *
-
 ## Recommended Memory Setup
 
 Appearance Continuity Director works best when the rest of your memory setup stays lean.
@@ -161,11 +141,11 @@ Appearance Continuity Director works best in scenarios with:
 
 Examples:
 
-* Margo leaves a gala still wearing a black silk dress and heels
-* Eliot gets blood on his cuffs during a fight
-* Quentin changes into dry clothes after rain
-* Alice keeps soot on her hands after spellwork
-* Penny shows up already worn, bruised, or half-packed for travel
+* a character leaves a gala still wearing formal clothes
+* someone gets blood on their sleeve during a fight
+* a character changes into dry clothes after rain
+* a spellcaster keeps soot on their hands after casting
+* a traveler shows up already worn, bruised, or half-packed
 
 * * *
 
@@ -196,7 +176,7 @@ Recommended stack order in `Library`:
 
 ## Scenario Script Install Guide
 
-Use the AI Dungeon website on PC (or view as desktop if mobile-only).
+Use the AI Dungeon website on PC, or view as desktop if mobile-only.
 
 Appearance Continuity Director is intended as an **add-on to Inner Self**, and should be pasted **below** Inner Self in the `Library` tab.
 
