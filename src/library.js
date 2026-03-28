@@ -7,8 +7,7 @@
     managedTitlePrefix: "Appearance - ",
     managedMarker: "[appearance-director:managed]",
 
-    autoDiscover: true,
-    discoverOnHooks: ["output"],
+    trackTitlePrefixes: ["Character - ", "NPC - "],
     createEmptyCards: false,
     pinCards: false,
 
@@ -18,21 +17,6 @@
     includeRecent: false,
     maxRecentItems: 1,
     recentLabelMax: 40,
-
-    candidateTypeAllowlist: ["character", "class"],
-    titlePrefixes: ["Character - ", "Character:", "NPC - ", "NPC:"],
-    discoveryMarkers: ["[track-appearance]", "[appearance]"],
-
-    explicitCharacters: [
-      // Optional overrides. Example:
-      // {
-      //   id: "jordan",
-      //   name: "Jordan Vale",
-      //   aliases: ["Jordan", "Jordan Vale"],
-      //   cardTitle: "Appearance - Jordan Vale",
-      //   cardKeys: "Jordan, Jordan Vale"
-      // }
-    ],
 
     ignoreAliases: [
       "appearance", "outfit", "outfits", "clothes", "clothing", "look", "looks", "looking",
@@ -124,7 +108,7 @@
       state[APPEARANCE_CONFIG.stateKey] = {
         tracked: {},
         processedTextHash: "",
-        discoveryHash: ""
+        cardCount: -1
       };
     }
     return state[APPEARANCE_CONFIG.stateKey];
@@ -283,8 +267,8 @@
     var value = normalizeSpace(title);
     var i, prefix;
 
-    for (i = 0; i < APPEARANCE_CONFIG.titlePrefixes.length; i++) {
-      prefix = APPEARANCE_CONFIG.titlePrefixes[i];
+    for (i = 0; i < APPEARANCE_CONFIG.trackTitlePrefixes.length; i++) {
+      prefix = APPEARANCE_CONFIG.trackTitlePrefixes[i];
       if (startsWithIgnoreCase(value, prefix)) {
         value = normalizeSpace(value.slice(prefix.length));
         break;
@@ -327,59 +311,26 @@
       entry.indexOf(lower(APPEARANCE_CONFIG.managedMarker)) !== -1;
   }
 
-  function isCandidateCharacterCard(card) {
-    var title, type, description, entry, i;
+  function isTrackableCharacterCard(card) {
+    var title, stripped, i;
 
     if (!card || isManagedAppearanceCard(card)) return false;
 
     title = normalizeSpace(card.title);
-    type = lower(card.type);
-    description = lower(card.description || "");
-    entry = lower(getCardText(card));
-
     if (!title) return false;
 
-    for (i = 0; i < APPEARANCE_CONFIG.discoveryMarkers.length; i++) {
-      if (description.indexOf(lower(APPEARANCE_CONFIG.discoveryMarkers[i])) !== -1 ||
-          entry.indexOf(lower(APPEARANCE_CONFIG.discoveryMarkers[i])) !== -1) {
-        return true;
+    for (i = 0; i < APPEARANCE_CONFIG.trackTitlePrefixes.length; i++) {
+      if (startsWithIgnoreCase(title, APPEARANCE_CONFIG.trackTitlePrefixes[i])) {
+        stripped = stripPrefix(title);
+        return looksLikeName(stripped);
       }
-    }
-
-    for (i = 0; i < APPEARANCE_CONFIG.titlePrefixes.length; i++) {
-      if (startsWithIgnoreCase(title, APPEARANCE_CONFIG.titlePrefixes[i])) return true;
-    }
-
-    if (APPEARANCE_CONFIG.candidateTypeAllowlist.indexOf(type) !== -1 && looksLikeName(stripPrefix(title))) {
-      return true;
     }
 
     return false;
   }
 
-  function buildDiscoveryHash() {
-    var cards = ensureCardsArray();
-    var parts = [];
-    var i, card;
-
-    for (i = 0; i < cards.length; i++) {
-      card = cards[i];
-      if (!card || isManagedAppearanceCard(card)) continue;
-      parts.push([
-        normalizeSpace(card.title),
-        normalizeSpace(card.type),
-        normalizeSpace(card.keys),
-        normalizeSpace(card.description || ""),
-        normalizeSpace(getCardText(card))
-      ].join("|"));
-    }
-
-    return simpleHash(parts.join("\n"));
-  }
-
-  function deriveTrackedCharacterFromCard(card) {
-    var strippedTitle = stripPrefix(card.title);
-    var displayName = strippedTitle || normalizeSpace(card.title);
+  function buildMetaFromCharacterCard(card) {
+    var displayName = stripPrefix(card.title);
     var aliases = dedupeList([displayName].concat(parseKeyAliases(card.keys)), 6).filter(function(alias) {
       return !looksGenericAlias(alias);
     });
@@ -392,7 +343,6 @@
       aliases: aliases,
       cardTitle: APPEARANCE_CONFIG.managedTitlePrefix + displayName,
       cardKeys: aliases.join(", "),
-      source: "auto",
       sourceCardTitle: normalizeSpace(card.title)
     };
   }
@@ -413,70 +363,41 @@
     return root.tracked[id] || null;
   }
 
-  function mergeCharacterMeta(existing, incoming) {
-    if (!existing) return incoming;
-    return {
-      id: incoming.id || existing.id,
-      name: incoming.name || existing.name,
-      aliases: dedupeList((incoming.aliases || []).concat(existing.aliases || []), 8),
-      cardTitle: incoming.cardTitle || existing.cardTitle,
-      cardKeys: incoming.cardKeys || existing.cardKeys,
-      source: incoming.source || existing.source,
-      sourceCardTitle: incoming.sourceCardTitle || existing.sourceCardTitle
-    };
-  }
-
-  function registerTrackedCharacter(meta) {
-    var tracked;
-    if (!meta || !meta.id) return null;
-    tracked = getTrackedState(meta.id, true);
-    tracked.meta = mergeCharacterMeta(tracked.meta, meta);
-    return tracked.meta;
-  }
-
-  function discoverCharacters(force) {
+  function refreshTrackedRegistry(force) {
     var root = ensureState();
-    var currentHash = buildDiscoveryHash();
-    var discovered = {};
-    var i, explicit, meta, cards, card, existing, key;
+    var cards = ensureCardsArray();
+    var nextTracked = {};
+    var i, card, meta, existing;
 
-    if (!force && root.discoveryHash === currentHash) return false;
-    root.discoveryHash = currentHash;
+    if (!force && root.cardCount === cards.length) return false;
+    root.cardCount = cards.length;
 
-    for (i = 0; i < APPEARANCE_CONFIG.explicitCharacters.length; i++) {
-      explicit = APPEARANCE_CONFIG.explicitCharacters[i];
-      if (!explicit || !explicit.id) continue;
+    for (i = 0; i < cards.length; i++) {
+      card = cards[i];
+      if (!isTrackableCharacterCard(card)) continue;
 
-      meta = {
-        id: explicit.id,
-        name: explicit.name || explicit.id,
-        aliases: dedupeList((explicit.aliases || []).concat([explicit.name || explicit.id]), 8),
-        cardTitle: explicit.cardTitle || (APPEARANCE_CONFIG.managedTitlePrefix + (explicit.name || explicit.id)),
-        cardKeys: explicit.cardKeys || dedupeList((explicit.aliases || []).concat([explicit.name || explicit.id]), 8).join(", "),
-        source: "config",
-        sourceCardTitle: explicit.sourceCardTitle || ""
+      meta = buildMetaFromCharacterCard(card);
+      existing = root.tracked[meta.id];
+
+      nextTracked[meta.id] = {
+        meta: existing && existing.meta ? {
+          id: meta.id,
+          name: meta.name,
+          aliases: dedupeList((meta.aliases || []).concat(existing.meta.aliases || []), 8),
+          cardTitle: meta.cardTitle,
+          cardKeys: meta.cardKeys,
+          sourceCardTitle: meta.sourceCardTitle
+        } : meta,
+        appearance: existing && existing.appearance ? existing.appearance : {
+          outfit: [],
+          condition: [],
+          details: [],
+          recent: []
+        }
       };
-
-      discovered[meta.id] = meta;
     }
 
-    if (APPEARANCE_CONFIG.autoDiscover) {
-      cards = ensureCardsArray();
-      for (i = 0; i < cards.length; i++) {
-        card = cards[i];
-        if (!isCandidateCharacterCard(card)) continue;
-        meta = deriveTrackedCharacterFromCard(card);
-        existing = discovered[meta.id];
-        discovered[meta.id] = mergeCharacterMeta(existing, meta);
-      }
-    }
-
-    for (key in discovered) {
-      if (Object.prototype.hasOwnProperty.call(discovered, key)) {
-        registerTrackedCharacter(discovered[key]);
-      }
-    }
-
+    root.tracked = nextTracked;
     return true;
   }
 
@@ -871,7 +792,7 @@
     var changed = false;
     var before, recentLabel;
 
-    tracked.meta = mergeCharacterMeta(tracked.meta, meta);
+    tracked.meta = meta;
 
     if (observations.clearCondition) {
       before = JSON.stringify(appearance.condition);
@@ -950,7 +871,7 @@
 
     if (!body) return false;
 
-    discoverCharacters(false);
+    refreshTrackedRegistry(false);
 
     root = ensureState();
     hash = simpleHash(body);
@@ -1021,7 +942,7 @@
       }
       root.tracked = {};
       root.processedTextHash = "";
-      root.discoveryHash = "";
+      root.cardCount = -1;
       return true;
     }
 
@@ -1054,7 +975,7 @@
   function addManualNote(query, noteText) {
     var meta, observations;
 
-    discoverCharacters(false);
+    refreshTrackedRegistry(false);
     meta = resolveCharacter(query);
     if (!meta) return false;
 
@@ -1066,12 +987,14 @@
   }
 
   function rescanCharacters() {
-    return discoverCharacters(true);
+    return refreshTrackedRegistry(true);
   }
 
   function run(hook) {
-    if (APPEARANCE_CONFIG.discoverOnHooks.indexOf(hook) !== -1) discoverCharacters(false);
-    if (hook === "output") scanLatestText(getLatestText());
+    if (hook === "output") {
+      refreshTrackedRegistry(false);
+      scanLatestText(getLatestText());
+    }
   }
 
   globalThis.AppearanceDirector = {
@@ -1086,7 +1009,7 @@
     },
 
     refresh: function(query) {
-      discoverCharacters(false);
+      refreshTrackedRegistry(false);
       if (query) return refreshManagedCard(query);
       return refreshAllManagedCards();
     },
@@ -1109,7 +1032,7 @@
 
     getCharacters: function() {
       var root, out, key, tracked;
-      discoverCharacters(false);
+      refreshTrackedRegistry(false);
       root = ensureState();
       out = [];
 
@@ -1124,7 +1047,7 @@
 
     getState: function(query) {
       var meta;
-      discoverCharacters(false);
+      refreshTrackedRegistry(false);
       if (!query) return ensureState().tracked;
       meta = resolveCharacter(query);
       if (!meta) return null;
