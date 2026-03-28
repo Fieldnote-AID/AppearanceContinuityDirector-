@@ -14,7 +14,11 @@ It is designed for scenarios where AI memory drift causes problems with:
 * long-form character presentation
 * appearance-based scene consistency
 
-Appearance Continuity Director is config-driven. You reuse the same engine across different scenarios by editing one data object at the top of the script.
+Appearance Continuity Director is built around **hybrid discovery**:
+
+* it can auto-discover likely character cards during play
+* it can pick up new character cards added mid-adventure
+* it still supports optional config overrides for aliases, includes, excludes, and custom managed card names
 
 * * *
 
@@ -24,7 +28,8 @@ Appearance Continuity Director manages live appearance continuity through script
 
 It automatically:
 
-* tracks appearance updates for configured characters
+* discovers likely character cards
+* picks up newly added character cards during play
 * scans latest AI-generated output for outfit and condition changes
 * updates one compact Story Card per tracked character
 * keeps appearance cards lean to avoid wasting Story Card budget
@@ -45,12 +50,12 @@ Appearance Continuity Director is not meant to replace your whole scenario setup
 
 You should still manage these manually:
 
+* AI Instructions
 * Plot Essentials
 * Story Summary
+* Author’s Note
 * character baseline cards
 * world cards
-* tone / style instructions
-* author notes
 * quest progression
 
 Appearance Continuity Director should be the source of truth for **live appearance state**, not for the entire world state.
@@ -61,49 +66,51 @@ It is also not a full semantic understanding engine. This script is regex-driven
 
 ## Main Features
 
-* **Automatic appearance tracking**  
-Detects when a tracked character’s outfit, condition, or visible details change in story output.
+* **Automatic discovery**  
+  Finds likely character cards and starts tracking them without requiring full manual setup.
+
+* **Mid-adventure pickup**  
+  New character cards added during play can be discovered and tracked automatically.
 
 * **Per-character appearance cards**  
-Maintains one Story Card per tracked character instead of creating lots of fragmented cards.
+  Maintains one compact Story Card per tracked character instead of creating lots of fragmented cards.
 
 * **Compact card output**  
-Keeps card text short so appearance continuity does not bloat Story Card context.
+  Keeps card text short so appearance continuity does not bloat Story Card context.
 
 * **Condition persistence**  
-Carries forward things like dirt, blood, soot, wet clothes, or torn clothing until the story signals cleanup or a clothing change.
+  Carries forward things like dirt, blood, soot, wet clothes, or torn clothing until the story signals cleanup or a clothing change.
 
-* **Config-driven design**  
-Reuse the same script engine across different scenarios by editing the config object.
-
-* **Minimal maintenance**  
-Players do not need to manually update appearance cards every few turns.
+* **Optional overrides**  
+  Lets you keep config for aliases, forced includes, custom managed card titles, or other edge cases.
 
 * **Inner Self compatible**  
-Wraps cleanly under Inner Self instead of replacing it.
+  Wraps cleanly under Inner Self instead of replacing it.
 
 * **Questline friendly**  
-Uses its own state storage and does not interfere with quest progression cards or quest tracking state.
+  Uses its own state storage and does not interfere with quest progression cards or quest tracking state.
 
 * * *
 
 ## How to Use / How It Works
 
-Appearance Continuity Director watches the latest AI output for configured character names and appearance-related language.
+Appearance Continuity Director watches the latest AI output for tracked character names and appearance-related language.
 
-When it sees a tracked change, it updates that character’s appearance Story Card.
+When it sees a tracked change, it updates that character’s managed appearance Story Card.
 
 In practice, the script does this:
 
-1. reads the latest AI-generated text
-2. looks for configured character names or aliases
-3. checks those lines for appearance signals
-4. sorts what it finds into:
+1. discovers likely character cards
+2. registers them as tracked characters
+3. reads the latest AI-generated text
+4. looks for tracked character names or aliases
+5. checks those lines for appearance signals
+6. sorts what it finds into:
    * outfit
    * condition
    * visible details
-5. updates that character’s tracked state
-6. refreshes that character’s appearance Story Card only if something changed
+7. updates that character’s tracked state
+8. refreshes that character’s appearance Story Card only if something changed
 
 This keeps appearance continuity live without forcing you to manually edit Story Cards every few turns.
 
@@ -111,105 +118,155 @@ This keeps appearance continuity live without forcing you to manually edit Story
 
 Story output:
 
-```text
-Jordan steps into the apartment still wearing a black coat and silver heels.
-```
+    Jordan steps into the apartment still wearing a black coat and silver heels.
 
 Managed card update:
 
-```text
-- Outfit: black coat; silver heels.
-```
+    - Outfit: black coat; silver heels.
 
 ### Example: automatic condition tracking
 
 Story output:
 
-```text
-Rowan’s jacket is bloodied at the cuff, and their shirt is rumpled.
-```
+    Rowan’s jacket is bloodied at the cuff, and their shirt is rumpled.
 
 Managed card update:
 
-```text
-- Outfit: jacket; shirt.
-- Condition: bloodied; rumpled.
-```
+    - Outfit: jacket; shirt.
+    - Condition: bloodied; rumpled.
 
 ### Example: condition persists until cleanup
 
 Story output:
 
-```text
-Alex stands there soot-streaked and damp, hair half-falling out of its tie.
-```
+    Alex stands there soot-streaked and damp, hair half-falling out of its tie.
 
 Managed card update:
 
-```text
-- Condition: soot-streaked; damp.
-- Details: hair half-falling out of its tie.
-```
+    - Condition: soot-streaked; damp.
+    - Details: hair half-falling out of its tie.
 
 Later story output:
 
-```text
-Alex showers, changes into clean clothes, and comes back freshly changed.
-```
+    Alex showers, changes into clean clothes, and comes back freshly changed.
 
 Managed card update:
 
-```text
-- Outfit: clean clothes.
-- Condition: freshly changed.
-```
+    - Outfit: clean clothes.
+    - Condition: freshly changed.
 
 ### Example: manual correction
 
 If the AI misses something, add it manually:
 
-```javascript
-AppearanceDirector.note(
-  "jordan",
-  "Outfit: black coat; silver heels | Condition: rain-soaked | Details: barefoot"
-);
-```
+    AppearanceDirector.note(
+      "jordan",
+      "Outfit: black coat; silver heels | Condition: rain-soaked | Details: barefoot"
+    );
 
 ### Example: clear one bucket
 
 If you want to clear only condition state:
 
-```javascript
-AppearanceDirector.clear("jordan", "condition");
-```
+    AppearanceDirector.clear("jordan", "condition");
 
 ### Example: reset one character
 
-```javascript
-AppearanceDirector.reset("jordan");
-```
+    AppearanceDirector.reset("jordan");
 
 This deletes that character’s tracked appearance state and removes their managed appearance card.
 
 ### Example: refresh cards
 
-```javascript
-AppearanceDirector.refresh();
-```
+    AppearanceDirector.refresh();
 
 Refreshes all currently tracked appearance cards.
 
-```javascript
-AppearanceDirector.refresh("jordan");
-```
+    AppearanceDirector.refresh("jordan");
 
 Refreshes only that character’s appearance card.
+
+### Example: rescan character cards
+
+    AppearanceDirector.rescan();
+
+Forces a new discovery pass over current Story Cards.
+
+* * *
+
+## Discovery Rules
+
+By default, the script tries to auto-discover likely character cards.
+
+A card is treated as a candidate character card if it matches at least one of these:
+
+* `type` is `character` or `class`
+* title starts with:
+  * `Character — `
+  * `Character - `
+  * `Character:`
+  * `NPC — `
+  * `NPC - `
+  * `NPC:`
+* the card contains one of these markers:
+  * `[track-appearance]`
+  * `[appearance]`
+
+The script ignores its own managed appearance cards.
+
+### Important note
+
+Auto-discovery works best when your base character cards have a clear title and at least one clean name key.
+
+If your setup is messy or unconventional, use explicit config overrides.
+
+* * *
+
+## Optional Config Overrides
+
+This script no longer requires a full pre-configured cast list, but config is still useful.
+
+Use `explicitCharacters` when you want to:
+
+* force-track a character even if discovery would miss them
+* provide better aliases
+* override a generated ID
+* override the managed appearance card title
+* override the managed appearance card keys
+
+Example:
+
+    explicitCharacters: [
+      {
+        id: "jordan",
+        name: "Jordan Vale",
+        aliases: ["Jordan", "Jordan Vale"],
+        cardTitle: "Appearance — Jordan Vale",
+        cardKeys: "Jordan, Jordan Vale"
+      }
+    ]
+
+Recommended use:
+
+* rely on auto-discovery for most characters
+* use config only for exceptions and cleanup
 
 * * *
 
 ## Recommended Memory Setup
 
 Appearance Continuity Director works best when the rest of your memory setup stays lean.
+
+### AI Instructions
+
+Use for:
+
+* behavior rules
+* POV and tense
+* style rules
+* generation guardrails
+
+Do **not** put live appearance continuity here.
 
 ### Plot Essentials
 
@@ -284,7 +341,7 @@ It does this by:
 * using its own dedicated state key
 * managing its own Story Cards only
 * avoiding quest-state mutation
-* avoiding Plot Essentials / Story Summary rewrites
+* avoiding Plot Essentials, Story Summary, and other core memory rewrites
 
 Recommended stack order in `Library`:
 
@@ -323,33 +380,27 @@ Your tabs should already look something like this:
 
 #### Input
 
-```javascript
-InnerSelf("input");
-const modifier = (text) => {
-  return { text };
-};
-modifier(text);
-```
+    InnerSelf("input");
+    const modifier = (text) => {
+      return { text };
+    };
+    modifier(text);
 
 #### Context
 
-```javascript
-InnerSelf("context");
-const modifier = (text) => {
-  return { text, stop };
-};
-modifier(text);
-```
+    InnerSelf("context");
+    const modifier = (text) => {
+      return { text, stop };
+    };
+    modifier(text);
 
 #### Output
 
-```javascript
-InnerSelf("output");
-const modifier = (text) => {
-  return { text };
-};
-modifier(text);
-```
+    InnerSelf("output");
+    const modifier = (text) => {
+      return { text };
+    };
+    modifier(text);
 
 You do **not** need to add any new calls to Input, Context, or Output for Appearance Continuity Director.
 
@@ -371,69 +422,56 @@ Appearance Continuity Director will hook into Inner Self automatically.
 
 All normal setup happens inside `APPEARANCE_CONFIG` near the top of the script.
 
-The most important section is:
+### Main fields
 
-```javascript
-characters: [
-  {
-    id: "jordan",
-    name: "Jordan Vale",
-    aliases: ["Jordan", "Jordan Vale"],
-    cardTitle: "Appearance — Jordan Vale",
-    cardKeys: "Jordan, Jordan Vale"
-  }
-]
-```
+* `autoDiscover`  
+  Enables automatic character discovery from Story Cards
 
-Each tracked character should have:
-
-* `id`  
-Internal unique identifier
-
-* `name`  
-Display name for the character
-
-* `aliases`  
-Names the script should look for in story output
-
-* `cardTitle`  
-The Story Card title the script will manage
-
-* `cardKeys`  
-Story Card keys for triggerability and discovery
-
-### Other useful config fields
+* `discoverOnHooks`  
+  Which hooks trigger discovery checks
 
 * `createEmptyCards`  
-If `false`, the script only creates a card after it has something meaningful to store
+  If `false`, the script only creates a managed appearance card after it has meaningful state
 
 * `maxFragmentsPerBucket`  
-How many outfit, condition, or detail fragments to keep
+  How many outfit, condition, or detail fragments to keep
 
 * `maxCardChars`  
-Hard cap for Story Card entry length
-
-* `runOnHooks`  
-Which hook phases should run the scanner  
-Default: output only
+  Hard cap for managed Story Card entry length
 
 * `pinCards`  
-Whether generated appearance cards should be pinned to the front of Story Cards
+  Whether generated appearance cards should be pinned to the front of Story Cards
+
+* `explicitCharacters`  
+  Optional manual overrides
+
+### Vocabulary fields
 
 * `garmentWords`  
-Clothing vocabulary
+  Clothing vocabulary
 
 * `accessoryWords`  
-Accessory vocabulary
+  Accessory vocabulary
 
 * `conditionWords`  
-Dirty, damaged, cleaned, or physical state vocabulary
+  Dirty, damaged, cleaned, or physical state vocabulary
 
 * `resetOutfitSignals`  
-Phrases that imply the outfit should be replaced instead of merged
+  Phrases that imply the outfit should be replaced instead of merged
 
 * `clearConditionSignals`  
-Phrases that imply dirt, blood, or grime should be removed
+  Phrases that imply dirt, blood, or grime should be removed
+
+### Discovery fields
+
+* `candidateTypeAllowlist`  
+  Card types that count as candidate character cards
+
+* `titlePrefixes`  
+  Title prefixes that count as candidate character cards
+
+* `discoveryMarkers`  
+  Marker strings that can force a card into discovery
 
 * * *
 
@@ -443,48 +481,47 @@ Appearance Continuity Director includes optional manual helpers.
 
 ### Refresh all managed appearance cards
 
-```javascript
-AppearanceDirector.refresh();
-```
+    AppearanceDirector.refresh();
 
 ### Refresh one tracked character
 
-```javascript
-AppearanceDirector.refresh("jordan");
-```
+    AppearanceDirector.refresh("jordan");
 
 ### Reset all tracked appearance state
 
-```javascript
-AppearanceDirector.reset();
-```
+    AppearanceDirector.reset();
 
 ### Reset one tracked character
 
-```javascript
-AppearanceDirector.reset("jordan");
-```
+    AppearanceDirector.reset("jordan");
 
 ### Add a manual note
 
-```javascript
-AppearanceDirector.note(
-  "jordan",
-  "Outfit: black coat; silver heels | Condition: rain-soaked | Details: barefoot"
-);
-```
+    AppearanceDirector.note(
+      "jordan",
+      "Outfit: black coat; silver heels | Condition: rain-soaked | Details: barefoot"
+    );
 
 ### Clear a specific bucket
 
-```javascript
-AppearanceDirector.clear("jordan", "condition");
-```
+    AppearanceDirector.clear("jordan", "condition");
 
 ### Force a scan manually
 
-```javascript
-AppearanceDirector.scan("Jordan steps in wearing a black coat, rain-soaked and barefoot.");
-```
+    AppearanceDirector.scan("Jordan steps in wearing a black coat, rain-soaked and barefoot.");
+
+### Force rediscovery of Story Cards
+
+    AppearanceDirector.rescan();
+
+### View discovered / tracked characters
+
+    AppearanceDirector.getCharacters();
+
+### View current tracked state
+
+    AppearanceDirector.getState();
+    AppearanceDirector.getState("jordan");
 
 Valid clearable buckets are:
 
@@ -501,13 +538,13 @@ The script keeps one Story Card per tracked character.
 
 Typical output looks like this:
 
-```text
-- Outfit: black coat; silver heels.
-- Condition: rain-soaked; bloodied.
-- Details: barefoot.
-```
+    - Outfit: black coat; silver heels.
+    - Condition: rain-soaked; bloodied.
+    - Details: barefoot.
 
 This keeps appearance state compact and readable without spreading it across multiple cards.
+
+Managed appearance cards are marked internally so the script can ignore its own generated cards during discovery.
 
 * * *
 
@@ -558,12 +595,15 @@ This script works best when:
 * appearance changes are described clearly
 * outfit changes are concrete
 * cleanup is actually narrated
+* base character cards are reasonably clean
 
 It works less well when:
 
 * the prose uses only pronouns for long stretches
 * appearance changes are implied but never stated
 * several characters are described in one tangled sentence
+* base character cards have messy or non-name keys
+* characters have no usable title or name-like trigger
 
 For best results, keep your tracked cast list focused on the characters who actually matter for recurring on-screen continuity.
 
@@ -580,6 +620,7 @@ It will be weaker when:
 * the AI uses highly abstract language instead of concrete description
 * multiple characters are described in one tangled sentence
 * appearance details depend on deep inference instead of explicit text
+* discovery has too little clean data to infer aliases correctly
 
 In practice, it performs best for straightforward lines like:
 
@@ -591,22 +632,6 @@ In practice, it performs best for straightforward lines like:
 
 * * *
 
-## Recommended Scenario Role Split
-
-For the cleanest long-form setup:
-
-* **AI Instructions** → behavior, POV, tone, generation rules
-* **Plot Essentials** → always-relevant truths
-* **Story Summary** → broad backstory
-* **Author’s Note** → short high-impact steering
-* **Story Cards** → characters, world facts, script-managed cards
-* **Questline** → quest progression
-* **Appearance Continuity Director** → live appearance continuity
-
-That split keeps each tool doing one job well.
-
-* * *
-
 ## Final Notes
 
 Appearance Continuity Director is meant to solve one specific problem:
@@ -615,4 +640,4 @@ Appearance Continuity Director is meant to solve one specific problem:
 
 If your scenario has recurring characters, changing outfits, messy aftermath, travel wear, blood, dirt, rain, battle damage, or image-conscious characters, this script helps keep those details from drifting away.
 
-It is intentionally narrow, lightweight, and built to slot cleanly into an Inner Self + Questline style setup.
+It is intentionally narrow, lightweight, and built to slot cleanly into an Inner Self plus Questline style setup.
