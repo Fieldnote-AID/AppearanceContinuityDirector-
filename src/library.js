@@ -1,132 +1,77 @@
-/* === Appearance Continuity Director ===
-   Paste this in Library BELOW Inner Self (and below Questline if you use it).
-
-   PURPOSE
-   - Tracks live appearance continuity for configured characters
-   - Updates one compact Story Card per tracked character
-   - Keeps card text small to avoid wasting Story Card context
-
-   MANUAL CONTROLS
-   - AppearanceDirector.refresh()
-   - AppearanceDirector.refresh("margo")
-   - AppearanceDirector.reset()
-   - AppearanceDirector.reset("margo")
-   - AppearanceDirector.note("margo", "Outfit: black silk dress | Condition: rain-soaked | Details: barefoot")
-   - AppearanceDirector.clear("margo", "condition")
-   - AppearanceDirector.scan("Margo steps in wearing a black silk dress, rain-soaked and barefoot.")
-*/
-
 (function installAppearanceContinuityDirector() {
   "use strict";
 
   const APPEARANCE_CONFIG = {
-    stateKey: "AppearanceDirector_Characters",
+    stateKey: "AppearanceDirector_State",
     cardType: "class",
+    managedTitlePrefix: "Appearance — ",
+    managedMarker: "[appearance-director:managed]",
 
-    // Context safety / card size
+    autoDiscover: true,
+    discoverOnHooks: ["output"],
     createEmptyCards: false,
     pinCards: false,
+
     maxFragmentsPerBucket: 2,
-    maxLastObservations: 1,
-    includeRecent: false,
-    recentLabelMax: 40,
-    maxScanWindowChars: 180,
     maxCardChars: 260,
+    maxScanWindowChars: 180,
+    includeRecent: false,
+    maxRecentItems: 1,
+    recentLabelMax: 40,
 
-    // Hooking
-    runOnHooks: ["output"],
+    candidateTypeAllowlist: ["character", "class"],
+    titlePrefixes: ["Character — ", "Character - ", "Character:", "NPC — ", "NPC - ", "NPC:"],
+    discoveryMarkers: ["[track-appearance]", "[appearance]"],
 
-    characters: [
-      {
-        id: "seth",
-        name: "Seth Vaelis",
-        aliases: ["Seth", "Seth Vaelis"],
-        cardTitle: "Appearance — Seth Vaelis",
-        cardKeys: "Seth, Seth Vaelis"
-      },
-      {
-        id: "margo",
-        name: "Margo Hanson",
-        aliases: ["Margo", "Margo Hanson"],
-        cardTitle: "Appearance — Margo Hanson",
-        cardKeys: "Margo, Margo Hanson"
-      },
-      {
-        id: "eliot",
-        name: "Eliot Waugh",
-        aliases: ["Eliot", "Eliot Waugh"],
-        cardTitle: "Appearance — Eliot Waugh",
-        cardKeys: "Eliot, Eliot Waugh"
-      },
-      {
-        id: "quentin",
-        name: "Quentin Coldwater",
-        aliases: ["Quentin", "Quentin Coldwater", "Q"],
-        cardTitle: "Appearance — Quentin Coldwater",
-        cardKeys: "Quentin, Quentin Coldwater, Q"
-      },
-      {
-        id: "alice",
-        name: "Alice Quinn",
-        aliases: ["Alice", "Alice Quinn"],
-        cardTitle: "Appearance — Alice Quinn",
-        cardKeys: "Alice, Alice Quinn"
-      },
-      {
-        id: "penny",
-        name: "Penny",
-        aliases: ["Penny"],
-        cardTitle: "Appearance — Penny",
-        cardKeys: "Penny"
-      }
+    explicitCharacters: [
+      // Optional overrides. Example:
+      // {
+      //   id: "jordan",
+      //   name: "Jordan Vale",
+      //   aliases: ["Jordan", "Jordan Vale"],
+      //   cardTitle: "Appearance — Jordan Vale",
+      //   cardKeys: "Jordan, Jordan Vale"
+      // }
     ],
 
-    bucketLabels: {
-      outfit: "Outfit",
-      condition: "Condition",
-      details: "Details",
-      recent: "Recent"
-    },
+    ignoreAliases: [
+      "appearance", "outfit", "outfits", "clothes", "clothing", "look", "looks", "looking", "character",
+      "npc", "person", "people", "world", "location", "quest", "objective", "milestone", "memory", "summary"
+    ],
 
     garmentWords: [
-      "coat", "jacket", "blazer", "suit", "shirt", "dress shirt", "tee", "t-shirt",
-      "sweater", "cardigan", "hoodie", "vest", "waistcoat", "tie", "bow tie", "scarf",
-      "cloak", "robe", "dress", "gown", "skirt", "pants", "trousers", "jeans",
-      "leggings", "shorts", "boots", "heels", "shoes", "sneakers", "loafers",
-      "sandals", "gloves", "stockings", "corset", "bodice", "uniform", "pajamas",
-      "pyjamas", "nightgown", "jumpsuit", "belt", "sleeves", "cuffs"
+      "coat", "jacket", "blazer", "suit", "shirt", "dress shirt", "tee", "t-shirt", "sweater", "cardigan",
+      "hoodie", "vest", "waistcoat", "tie", "bow tie", "scarf", "cloak", "robe", "dress", "gown", "skirt",
+      "pants", "trousers", "jeans", "leggings", "shorts", "boots", "heels", "shoes", "sneakers", "loafers",
+      "sandals", "gloves", "stockings", "corset", "bodice", "uniform", "pajamas", "pyjamas", "nightgown",
+      "jumpsuit", "belt", "sleeves", "cuffs"
     ],
 
     accessoryWords: [
-      "ring", "rings", "necklace", "pendant", "earring", "earrings", "bracelet",
-      "bracelets", "watch", "crown", "tiara", "glasses", "spectacles", "mask",
-      "hat", "cap", "hood", "bag", "satchel", "flask", "cane", "staff"
+      "ring", "rings", "necklace", "pendant", "earring", "earrings", "bracelet", "bracelets", "watch", "crown",
+      "tiara", "glasses", "spectacles", "mask", "hat", "cap", "hood", "bag", "satchel", "flask", "cane", "staff"
     ],
 
     conditionWords: [
-      "dirty", "filthy", "muddy", "dusty", "bloodied", "bloody", "blood-soaked",
-      "soaked", "rain-soaked", "wet", "damp", "sweaty", "smudged", "smeared",
-      "stained", "wine-stained", "rumpled", "wrinkled", "torn", "ripped", "singed",
-      "burned", "charred", "soot-streaked", "ash-streaked", "bruised", "cut",
-      "scratched", "bandaged", "disheveled", "dishevelled", "unkempt", "clean",
-      "fresh", "freshly changed"
+      "dirty", "filthy", "muddy", "dusty", "bloodied", "bloody", "blood-soaked", "soaked", "rain-soaked", "wet",
+      "damp", "sweaty", "smudged", "smeared", "stained", "wine-stained", "rumpled", "wrinkled", "torn", "ripped",
+      "singed", "burned", "charred", "soot-streaked", "ash-streaked", "bruised", "cut", "scratched", "bandaged",
+      "disheveled", "dishevelled", "unkempt", "clean", "fresh", "freshly changed"
     ],
 
     resetOutfitSignals: [
-      "changed into", "changes into", "now wearing", "now wears", "dressed in",
-      "clad in", "fresh clothes", "freshly changed", "slipped into", "pulls on",
-      "pulled on", "buttoned into"
+      "changed into", "changes into", "now wearing", "now wears", "dressed in", "clad in", "fresh clothes",
+      "freshly changed", "slipped into", "pulls on", "pulled on", "buttoned into"
     ],
 
     clearConditionSignals: [
-      "washed off", "washed away", "cleaned up", "cleaned off", "changed clothes",
-      "changed into", "showered", "bathed", "scrubbed clean", "fresh clothes",
-      "freshly changed", "no longer dirty", "clean again"
+      "washed off", "washed away", "cleaned up", "cleaned off", "changed clothes", "changed into", "showered",
+      "bathed", "scrubbed clean", "fresh clothes", "freshly changed", "no longer dirty", "clean again"
     ]
   };
 
-  function safeString(v) {
-    return typeof v === "string" ? v : "";
+  function safeString(value) {
+    return typeof value === "string" ? value : "";
   }
 
   function normalizeSpace(text) {
@@ -151,13 +96,25 @@
     return value.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
   }
 
-  function simpleHash(text) {
-    const body = safeString(text);
-    let hash = 0;
-    for (let i = 0; i < body.length; i++) {
-      hash = ((hash << 5) - hash + body.charCodeAt(i)) | 0;
-    }
-    return String(hash);
+  function slugify(text) {
+    return lower(text)
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "character";
+  }
+
+  function ensureCardsArray() {
+    globalThis.storyCards ??= [];
+    return storyCards;
+  }
+
+  function ensureState() {
+    globalThis.state ??= {};
+    state[APPEARANCE_CONFIG.stateKey] ??= {
+      tracked: {},
+      processedTextHash: "",
+      discoveryHash: ""
+    };
+    return state[APPEARANCE_CONFIG.stateKey];
   }
 
   function dedupeList(list, limit) {
@@ -191,6 +148,14 @@
     return kept;
   }
 
+  function uniquePush(list, value, limit) {
+    const clean = normalizeSpace(value);
+    if (!clean) return Array.isArray(list) ? list : [];
+    const next = Array.isArray(list) ? list.slice() : [];
+    if (!next.some(item => lower(item) === lower(clean))) next.unshift(clean);
+    return dedupeList(next, limit);
+  }
+
   function compactList(list, maxItems, maxItemChars) {
     return dedupeList(list, maxItems)
       .slice(0, maxItems)
@@ -198,96 +163,21 @@
       .filter(Boolean);
   }
 
-  function uniquePush(list, value, limit) {
-    const clean = normalizeSpace(value);
-    if (!clean) return Array.isArray(list) ? list : [];
-    const next = Array.isArray(list) ? list.slice() : [];
-    const exists = next.some(item => lower(item) === lower(clean));
-    if (!exists) next.unshift(clean);
-    return dedupeList(next, limit);
-  }
-
   function removeListItems(list, predicate) {
     return (Array.isArray(list) ? list : []).filter(item => !predicate(lower(item), item));
   }
 
-  function ensureCardsArray() {
-    globalThis.storyCards ??= [];
-    return storyCards;
-  }
-
-  function ensureState() {
-    globalThis.state ??= {};
-    state[APPEARANCE_CONFIG.stateKey] ??= {
-      characters: {},
-      processedTextHash: "",
-      initialized: false
-    };
-    return state[APPEARANCE_CONFIG.stateKey];
-  }
-
-  function configById(id) {
-    return APPEARANCE_CONFIG.characters.find(c => c.id === id) || null;
-  }
-
-  function findCard(title) {
-    const target = lower(title);
-    return ensureCardsArray().find(card => lower(card?.title) === target) || null;
-  }
-
-  function removeCard(title) {
-    const cards = ensureCardsArray();
-    const target = lower(title);
-    for (let i = cards.length - 1; i >= 0; i--) {
-      if (lower(cards[i]?.title) === target) {
-        cards.splice(i, 1);
-      }
+  function simpleHash(text) {
+    const body = safeString(text);
+    let hash = 0;
+    for (let i = 0; i < body.length; i++) {
+      hash = ((hash << 5) - hash + body.charCodeAt(i)) | 0;
     }
+    return String(hash);
   }
 
-  function upsertCard(cardConfig) {
-    const cards = ensureCardsArray();
-    let card = findCard(cardConfig.title);
-
-    if (!card && typeof addStoryCard === "function") {
-      try {
-        addStoryCard("%@%");
-        card = cards.find(c => c.title === "%@%") || null;
-      } catch (_) {}
-    }
-
-    if (!card) {
-      card = {
-        title: "%@%",
-        keys: "",
-        entry: "",
-        description: "",
-        type: APPEARANCE_CONFIG.cardType
-      };
-      cards.unshift(card);
-    }
-
-    card.type = APPEARANCE_CONFIG.cardType;
-    card.title = cardConfig.title;
-    card.keys = cardConfig.keys;
-    card.entry = cardConfig.entry;
-    card.description = "";
-
-    if (cardConfig.pinned) {
-      const index = cards.indexOf(card);
-      if (index > 0) {
-        cards.splice(index, 1);
-        cards.unshift(card);
-      }
-    }
-
-    return card;
-  }
-
-  function getLatestText() {
-    if (normalizeSpace(globalThis.text)) return globalThis.text;
-    const last = Array.isArray(globalThis.history) ? history[history.length - 1] : null;
-    return safeString(last?.text || last?.rawText);
+  function sortWordsByLength(words) {
+    return (Array.isArray(words) ? words : []).slice().sort((a, b) => b.length - a.length);
   }
 
   function splitIntoSegments(text) {
@@ -295,26 +185,6 @@
       .split(/(?<=[.!?\n])\s+|[\n\r]+/)
       .map(normalizeSpace)
       .filter(Boolean);
-  }
-
-  function aliasRegexes(aliases) {
-    return (Array.isArray(aliases) ? aliases : [])
-      .map(alias => normalizeSpace(alias))
-      .filter(Boolean)
-      .map(alias => new RegExp(`\\b${escapeRegex(alias)}\\b`, "i"));
-  }
-
-  function segmentMentionsCharacter(segment, character) {
-    return aliasRegexes(character.aliases).some(rx => rx.test(segment));
-  }
-
-  function textHasAny(text, terms) {
-    const body = lower(text);
-    return (Array.isArray(terms) ? terms : []).some(term => body.includes(lower(term)));
-  }
-
-  function sortWordsByLength(words) {
-    return (Array.isArray(words) ? words : []).slice().sort((a, b) => b.length - a.length);
   }
 
   function normalizeFragment(text) {
@@ -333,6 +203,202 @@
   function hasLexiconWord(text, words) {
     const body = lower(text);
     return (Array.isArray(words) ? words : []).some(word => body.includes(lower(word)));
+  }
+
+  function looksGenericAlias(text) {
+    const value = lower(text);
+    return !value || APPEARANCE_CONFIG.ignoreAliases.includes(value);
+  }
+
+  function stripPrefix(title) {
+    let value = normalizeSpace(title);
+    for (const prefix of APPEARANCE_CONFIG.titlePrefixes) {
+      if (value.toLowerCase().startsWith(prefix.toLowerCase())) {
+        value = normalizeSpace(value.slice(prefix.length));
+        break;
+      }
+    }
+    return value;
+  }
+
+  function looksLikeName(text) {
+    const value = normalizeSpace(text);
+    if (!value) return false;
+    if (value.length > 40) return false;
+    if (looksGenericAlias(value)) return false;
+    if (!/^[A-Za-z0-9][A-Za-z0-9'’\- ]*[A-Za-z0-9]$/.test(value)) return false;
+    const wordCount = value.split(/\s+/).length;
+    return wordCount >= 1 && wordCount <= 4;
+  }
+
+  function parseKeyAliases(keys) {
+    return safeString(keys)
+      .split(",")
+      .map(normalizeSpace)
+      .filter(looksLikeName)
+      .filter(alias => !looksGenericAlias(alias));
+  }
+
+  function isManagedAppearanceCard(card) {
+    const title = lower(card?.title);
+    const description = lower(card?.description);
+    const entry = lower(card?.entry || card?.value);
+    return title.startsWith(lower(APPEARANCE_CONFIG.managedTitlePrefix))
+      || description.includes(lower(APPEARANCE_CONFIG.managedMarker))
+      || entry.includes(lower(APPEARANCE_CONFIG.managedMarker));
+  }
+
+  function isCandidateCharacterCard(card) {
+    if (!card || isManagedAppearanceCard(card)) return false;
+
+    const title = normalizeSpace(card.title);
+    const type = lower(card.type);
+    const description = lower(card.description || "");
+    const entry = lower(card.entry || card.value || "");
+
+    if (!title) return false;
+    if (APPEARANCE_CONFIG.candidateTypeAllowlist.includes(type)) return true;
+    if (APPEARANCE_CONFIG.titlePrefixes.some(prefix => title.toLowerCase().startsWith(prefix.toLowerCase()))) return true;
+    if (APPEARANCE_CONFIG.discoveryMarkers.some(marker => description.includes(lower(marker)) || entry.includes(lower(marker)))) return true;
+    return false;
+  }
+
+  function buildDiscoveryHash() {
+    const cards = ensureCardsArray();
+    const parts = [];
+    for (const card of cards) {
+      if (!card || isManagedAppearanceCard(card)) continue;
+      parts.push([
+        normalizeSpace(card.title),
+        normalizeSpace(card.type),
+        normalizeSpace(card.keys),
+        normalizeSpace(card.description || ""),
+        normalizeSpace(card.entry || card.value || "")
+      ].join("|"));
+    }
+    return simpleHash(parts.join("\n"));
+  }
+
+  function deriveTrackedCharacterFromCard(card) {
+    const strippedTitle = stripPrefix(card.title);
+    const displayName = strippedTitle || normalizeSpace(card.title);
+    const aliases = dedupeList([displayName].concat(parseKeyAliases(card.keys)), 6)
+      .filter(alias => !looksGenericAlias(alias));
+
+    const id = slugify(displayName);
+
+    return {
+      id,
+      name: displayName,
+      aliases,
+      cardTitle: `${APPEARANCE_CONFIG.managedTitlePrefix}${displayName}`,
+      cardKeys: aliases.join(", "),
+      source: "auto",
+      sourceCardTitle: normalizeSpace(card.title)
+    };
+  }
+
+  function getTrackedState(id, create = true) {
+    const root = ensureState();
+    if (!root.tracked[id] && create) {
+      root.tracked[id] = {
+        meta: null,
+        appearance: {
+          outfit: [],
+          condition: [],
+          details: [],
+          recent: []
+        }
+      };
+    }
+    return root.tracked[id] || null;
+  }
+
+  function mergeCharacterMeta(existing, incoming) {
+    if (!existing) return incoming;
+    return {
+      id: incoming.id || existing.id,
+      name: incoming.name || existing.name,
+      aliases: dedupeList((incoming.aliases || []).concat(existing.aliases || []), 8),
+      cardTitle: incoming.cardTitle || existing.cardTitle,
+      cardKeys: incoming.cardKeys || existing.cardKeys,
+      source: incoming.source || existing.source,
+      sourceCardTitle: incoming.sourceCardTitle || existing.sourceCardTitle
+    };
+  }
+
+  function registerTrackedCharacter(meta) {
+    if (!meta || !meta.id) return null;
+    const tracked = getTrackedState(meta.id, true);
+    tracked.meta = mergeCharacterMeta(tracked.meta, meta);
+    return tracked.meta;
+  }
+
+  function discoverCharacters(force) {
+    const root = ensureState();
+    const currentHash = buildDiscoveryHash();
+    if (!force && root.discoveryHash === currentHash) return false;
+    root.discoveryHash = currentHash;
+
+    const discovered = new Map();
+
+    for (const explicit of APPEARANCE_CONFIG.explicitCharacters) {
+      if (!explicit || !explicit.id) continue;
+      const meta = {
+        id: explicit.id,
+        name: explicit.name || explicit.id,
+        aliases: dedupeList((explicit.aliases || []).concat([explicit.name || explicit.id]), 8),
+        cardTitle: explicit.cardTitle || `${APPEARANCE_CONFIG.managedTitlePrefix}${explicit.name || explicit.id}`,
+        cardKeys: explicit.cardKeys || dedupeList((explicit.aliases || []).concat([explicit.name || explicit.id]), 8).join(", "),
+        source: "config",
+        sourceCardTitle: explicit.sourceCardTitle || ""
+      };
+      discovered.set(meta.id, meta);
+    }
+
+    if (APPEARANCE_CONFIG.autoDiscover) {
+      for (const card of ensureCardsArray()) {
+        if (!isCandidateCharacterCard(card)) continue;
+        const meta = deriveTrackedCharacterFromCard(card);
+        const existing = discovered.get(meta.id);
+        discovered.set(meta.id, mergeCharacterMeta(existing, meta));
+      }
+    }
+
+    for (const meta of discovered.values()) {
+      registerTrackedCharacter(meta);
+    }
+
+    return true;
+  }
+
+  function resolveCharacter(query) {
+    const root = ensureState();
+    if (!query) return null;
+    const target = lower(query);
+    for (const tracked of Object.values(root.tracked)) {
+      const meta = tracked?.meta;
+      if (!meta) continue;
+      if (lower(meta.id) === target) return meta;
+      if (lower(meta.name) === target) return meta;
+      if (lower(meta.cardTitle) === target) return meta;
+      if ((meta.aliases || []).some(alias => lower(alias) === target)) return meta;
+    }
+    return null;
+  }
+
+  function aliasRegexes(aliases) {
+    return dedupeList(aliases, 8)
+      .map(alias => new RegExp(`\\b${escapeRegex(alias)}\\b`, "i"));
+  }
+
+  function segmentMentionsCharacter(segment, meta) {
+    return aliasRegexes(meta.aliases || []).some(rx => rx.test(segment));
+  }
+
+  function textHasAny(text, terms) {
+    const body = lower(text);
+    return (Array.isArray(terms) ? terms : []).some(term => body.includes(lower(term)));
   }
 
   function shouldTreatSegmentAsAppearance(segment) {
@@ -377,7 +443,7 @@
 
     let match;
     while ((match = nounPhrase.exec(body))) {
-      let phrase = normalizeFragment(match[0])
+      const phrase = normalizeFragment(match[0])
         .replace(/\b(?:dirty|filthy|muddy|dusty|bloodied|bloody|blood-soaked|soaked|rain-soaked|wet|damp|sweaty|smudged|smeared|stained|wine-stained|rumpled|wrinkled|torn|ripped|singed|burned|charred|soot-streaked|ash-streaked|bruised|cut|scratched|bandaged|disheveled|dishevelled|unkempt|clean|fresh|freshly changed)\b/gi, "")
         .replace(/\s{2,}/g, " ")
         .replace(/^(?:a|an|the)\s+/i, "")
@@ -429,7 +495,7 @@
   function extractPatternFragments(segment, aliases) {
     const found = [];
 
-    for (const alias of aliases) {
+    for (const alias of aliases || []) {
       const a = escapeRegex(alias);
       const patterns = [
         new RegExp(`\\b${a}\\b[^.!?\\n]{0,40}\\b(?:is|was|looks|looked|appears|appeared|stands|stood|remains|seems)\\b([^.!?\\n]{0,90})`, "i"),
@@ -439,9 +505,7 @@
 
       for (const pattern of patterns) {
         const match = segment.match(pattern);
-        if (match && match[1]) {
-          found.push(match[1]);
-        }
+        if (match && match[1]) found.push(match[1]);
       }
     }
 
@@ -450,11 +514,9 @@
 
   function bucketForFragment(fragment) {
     const body = lower(fragment);
-
     if (hasLexiconWord(body, APPEARANCE_CONFIG.conditionWords)) return "condition";
     if (hasLexiconWord(body, APPEARANCE_CONFIG.garmentWords) || hasLexiconWord(body, APPEARANCE_CONFIG.accessoryWords)) return "outfit";
     if (/\b(?:hair|face|eyes|makeup|lipstick|mascara|stubble|beard|scar|tattoo|bruise|cut|barefoot|shirtless)\b/i.test(fragment)) return "details";
-
     return null;
   }
 
@@ -466,111 +528,130 @@
     return shorten(bits.join(" | "), APPEARANCE_CONFIG.recentLabelMax);
   }
 
-  function getCharacterState(characterId, create = true) {
-    const root = ensureState();
-    if (!root.characters[characterId] && create) {
-      root.characters[characterId] = {
-        outfit: [],
-        condition: [],
-        details: [],
-        recent: [],
-        lastSnippet: ""
-      };
-    }
-    return root.characters[characterId] || null;
-  }
-
-  function hasMeaningfulState(stateEntry) {
+  function hasMeaningfulAppearance(stateEntry) {
     if (!stateEntry) return false;
     return Boolean(
-      (stateEntry.outfit && stateEntry.outfit.length)
-      || (stateEntry.condition && stateEntry.condition.length)
-      || (stateEntry.details && stateEntry.details.length)
-      || (APPEARANCE_CONFIG.includeRecent && stateEntry.recent && stateEntry.recent.length)
+      stateEntry.outfit?.length
+      || stateEntry.condition?.length
+      || stateEntry.details?.length
+      || (APPEARANCE_CONFIG.includeRecent && stateEntry.recent?.length)
     );
   }
 
   function clearEphemeralCondition(stateEntry) {
-    stateEntry.condition = removeListItems(stateEntry.condition, key => {
-      return /(dirty|filthy|muddy|dusty|bloodied|bloody|blood-soaked|soaked|wet|damp|sweaty|smudged|smeared|stained|rumpled|wrinkled|torn|ripped|singed|charred|soot-streaked|ash-streaked|disheveled|dishevelled|unkempt)/i.test(key);
-    });
+    stateEntry.condition = removeListItems(stateEntry.condition, key => /(dirty|filthy|muddy|dusty|bloodied|bloody|blood-soaked|soaked|wet|damp|sweaty|smudged|smeared|stained|rumpled|wrinkled|torn|ripped|singed|charred|soot-streaked|ash-streaked|disheveled|dishevelled|unkempt)/i.test(key));
   }
 
   function replaceBucket(stateEntry, bucket, values) {
     stateEntry[bucket] = dedupeList(values, APPEARANCE_CONFIG.maxFragmentsPerBucket);
   }
 
-  function mergeBucket(stateEntry, bucket, values) {
+  function mergeBucket(stateEntry, bucket, values, limit) {
     let next = Array.isArray(stateEntry[bucket]) ? stateEntry[bucket].slice() : [];
     for (const value of values) {
-      next = uniquePush(next, value, APPEARANCE_CONFIG.maxFragmentsPerBucket);
+      next = uniquePush(next, value, typeof limit === "number" ? limit : APPEARANCE_CONFIG.maxFragmentsPerBucket);
     }
-    stateEntry[bucket] = dedupeList(next, APPEARANCE_CONFIG.maxFragmentsPerBucket);
+    stateEntry[bucket] = dedupeList(next, typeof limit === "number" ? limit : APPEARANCE_CONFIG.maxFragmentsPerBucket);
   }
 
-  function buildCharacterCardEntry(stateEntry) {
-    const outfit = compactList(stateEntry.outfit, 2, 26);
-    const condition = compactList(stateEntry.condition, 2, 24);
-    const details = compactList(stateEntry.details, 1, 24);
-    const recent = compactList(stateEntry.recent, 1, 32);
-
-    const sections = [
-      outfit.length ? `- ${APPEARANCE_CONFIG.bucketLabels.outfit}: ${outfit.join("; ")}.` : "",
-      condition.length ? `- ${APPEARANCE_CONFIG.bucketLabels.condition}: ${condition.join("; ")}.` : "",
-      details.length ? `- ${APPEARANCE_CONFIG.bucketLabels.details}: ${details.join("; ")}.` : "",
-      APPEARANCE_CONFIG.includeRecent && recent.length ? `- ${APPEARANCE_CONFIG.bucketLabels.recent}: ${recent[0]}.` : ""
-    ].filter(Boolean);
-
-    let entry = sections.join("\n");
-
-    if (!entry) entry = "- Appearance: no tracked changes yet.";
-
-    if (entry.length > APPEARANCE_CONFIG.maxCardChars) {
-      entry = sections.slice(0, 3).join("\n");
-    }
-    if (entry.length > APPEARANCE_CONFIG.maxCardChars && details.length) {
-      entry = [
-        outfit.length ? `- ${APPEARANCE_CONFIG.bucketLabels.outfit}: ${outfit.join("; ")}.` : "",
-        condition.length ? `- ${APPEARANCE_CONFIG.bucketLabels.condition}: ${condition.join("; ")}.` : ""
-      ].filter(Boolean).join("\n");
-    }
-    if (entry.length > APPEARANCE_CONFIG.maxCardChars) {
-      entry = shorten(entry, APPEARANCE_CONFIG.maxCardChars);
-    }
-
-    return entry;
+  function findCard(title) {
+    const target = lower(title);
+    return ensureCardsArray().find(card => lower(card?.title) === target) || null;
   }
 
-  function refreshCharacterCard(character, options = {}) {
-    const { allowEmpty = APPEARANCE_CONFIG.createEmptyCards } = options;
-    const stateEntry = getCharacterState(character.id, false);
+  function removeManagedCard(title) {
+    const cards = ensureCardsArray();
+    const target = lower(title);
+    for (let i = cards.length - 1; i >= 0; i--) {
+      if (lower(cards[i]?.title) === target) cards.splice(i, 1);
+    }
+  }
 
-    if (!stateEntry || !hasMeaningfulState(stateEntry)) {
-      if (!allowEmpty) {
-        removeCard(character.cardTitle || `Appearance — ${character.name}`);
-        return null;
+  function upsertManagedCard(meta, entry) {
+    const cards = ensureCardsArray();
+    let card = findCard(meta.cardTitle);
+
+    if (!card && typeof addStoryCard === "function") {
+      try {
+        addStoryCard("%@%");
+        card = cards.find(c => c.title === "%@%") || null;
+      } catch (_) {}
+    }
+
+    if (!card) {
+      card = { title: "%@%", keys: "", entry: "", description: "", type: APPEARANCE_CONFIG.cardType };
+      cards.unshift(card);
+    }
+
+    card.type = APPEARANCE_CONFIG.cardType;
+    card.title = meta.cardTitle;
+    card.keys = meta.cardKeys;
+    card.entry = entry;
+    card.description = APPEARANCE_CONFIG.managedMarker;
+
+    if (APPEARANCE_CONFIG.pinCards) {
+      const index = cards.indexOf(card);
+      if (index > 0) {
+        cards.splice(index, 1);
+        cards.unshift(card);
       }
     }
 
-    const entry = stateEntry
-      ? buildCharacterCardEntry(stateEntry)
-      : "- Appearance: no tracked changes yet.";
-
-    return upsertCard({
-      title: character.cardTitle || `Appearance — ${character.name}`,
-      keys: character.cardKeys || [character.name].concat(character.aliases || []).join(", "),
-      entry,
-      pinned: !!APPEARANCE_CONFIG.pinCards
-    });
+    return card;
   }
 
-  function refreshAllTrackedCards() {
-    for (const character of APPEARANCE_CONFIG.characters) {
-      refreshCharacterCard(character, { allowEmpty: false });
+  function buildManagedCardEntry(appearance) {
+    const outfit = compactList(appearance.outfit, 2, 26);
+    const condition = compactList(appearance.condition, 2, 24);
+    const details = compactList(appearance.details, 1, 24);
+    const recent = compactList(appearance.recent, 1, 32);
+
+    const sections = [
+      outfit.length ? `- Outfit: ${outfit.join("; ")}.` : "",
+      condition.length ? `- Condition: ${condition.join("; ")}.` : "",
+      details.length ? `- Details: ${details.join("; ")}.` : "",
+      APPEARANCE_CONFIG.includeRecent && recent.length ? `- Recent: ${recent[0]}.` : ""
+    ].filter(Boolean);
+
+    let entry = sections.join("\n");
+    if (!entry) entry = "- Appearance: no tracked changes yet.";
+    if (entry.length > APPEARANCE_CONFIG.maxCardChars) entry = sections.slice(0, 3).join("\n");
+    if (entry.length > APPEARANCE_CONFIG.maxCardChars && details.length) {
+      entry = [
+        outfit.length ? `- Outfit: ${outfit.join("; ")}.` : "",
+        condition.length ? `- Condition: ${condition.join("; ")}.` : ""
+      ].filter(Boolean).join("\n");
     }
+    if (entry.length > APPEARANCE_CONFIG.maxCardChars) entry = shorten(entry, APPEARANCE_CONFIG.maxCardChars);
+    return entry;
   }
 
-  function inferObservations(segment, character) {
+  function refreshManagedCard(query) {
+    const meta = typeof query === "string" ? resolveCharacter(query) : query;
+    if (!meta) return false;
+
+    const tracked = getTrackedState(meta.id, false);
+    if (!tracked || !hasMeaningfulAppearance(tracked.appearance)) {
+      if (!APPEARANCE_CONFIG.createEmptyCards) {
+        removeManagedCard(meta.cardTitle);
+        return true;
+      }
+    }
+
+    const entry = tracked ? buildManagedCardEntry(tracked.appearance) : "- Appearance: no tracked changes yet.";
+    upsertManagedCard(meta, entry);
+    return true;
+  }
+
+  function refreshAllManagedCards() {
+    const root = ensureState();
+    for (const tracked of Object.values(root.tracked)) {
+      if (tracked?.meta) refreshManagedCard(tracked.meta);
+    }
+    return true;
+  }
+
+  function inferObservations(segment, meta) {
     const observations = {
       outfit: [],
       condition: [],
@@ -580,11 +661,10 @@
     };
 
     const normalizedSegment = normalizeSpace(segment).slice(0, APPEARANCE_CONFIG.maxScanWindowChars);
-    const fragments = extractPatternFragments(normalizedSegment, character.aliases);
+    const fragments = extractPatternFragments(normalizedSegment, meta.aliases || []);
 
     observations.resetOutfit = textHasAny(normalizedSegment, APPEARANCE_CONFIG.resetOutfitSignals);
     observations.clearCondition = textHasAny(normalizedSegment, APPEARANCE_CONFIG.clearConditionSignals);
-
     observations.outfit.push(...extractOutfitPhrases(normalizedSegment));
     observations.condition.push(...extractConditionPhrases(normalizedSegment));
     observations.details.push(...extractDetailPhrases(normalizedSegment));
@@ -592,108 +672,96 @@
     if (!observations.outfit.length && !observations.condition.length && !observations.details.length) {
       for (const fragment of fragments) {
         const bucket = bucketForFragment(fragment);
-        if (!bucket) continue;
         const clean = normalizeFragment(fragment);
-        if (!clean) continue;
-        observations[bucket].push(clean);
+        if (bucket && clean) observations[bucket].push(clean);
       }
     }
 
     observations.outfit = dedupeList(observations.outfit, APPEARANCE_CONFIG.maxFragmentsPerBucket);
     observations.condition = dedupeList(observations.condition, APPEARANCE_CONFIG.maxFragmentsPerBucket);
     observations.details = dedupeList(observations.details, 1);
-
     return observations;
   }
 
-  function applyObservations(character, observations) {
-    const stateEntry = getCharacterState(character.id, true);
+  function applyObservations(meta, observations) {
+    const tracked = getTrackedState(meta.id, true);
+    tracked.meta = mergeCharacterMeta(tracked.meta, meta);
+
     let changed = false;
+    const appearance = tracked.appearance;
 
     if (observations.clearCondition) {
-      const before = JSON.stringify(stateEntry.condition);
-      clearEphemeralCondition(stateEntry);
-      changed ||= (before !== JSON.stringify(stateEntry.condition));
+      const before = JSON.stringify(appearance.condition);
+      clearEphemeralCondition(appearance);
+      changed ||= before !== JSON.stringify(appearance.condition);
     }
 
     if (observations.outfit.length) {
-      const before = JSON.stringify(stateEntry.outfit);
-      if (observations.resetOutfit) {
-        replaceBucket(stateEntry, "outfit", observations.outfit);
-      } else {
-        mergeBucket(stateEntry, "outfit", observations.outfit);
-      }
-      changed ||= (before !== JSON.stringify(stateEntry.outfit));
+      const before = JSON.stringify(appearance.outfit);
+      if (observations.resetOutfit) replaceBucket(appearance, "outfit", observations.outfit);
+      else mergeBucket(appearance, "outfit", observations.outfit);
+      changed ||= before !== JSON.stringify(appearance.outfit);
     }
 
     if (observations.condition.length) {
-      const before = JSON.stringify(stateEntry.condition);
-      mergeBucket(stateEntry, "condition", observations.condition);
-      changed ||= (before !== JSON.stringify(stateEntry.condition));
+      const before = JSON.stringify(appearance.condition);
+      mergeBucket(appearance, "condition", observations.condition);
+      changed ||= before !== JSON.stringify(appearance.condition);
     }
 
     if (observations.details.length) {
-      const before = JSON.stringify(stateEntry.details);
-      mergeBucket(stateEntry, "details", observations.details);
-      changed ||= (before !== JSON.stringify(stateEntry.details));
+      const before = JSON.stringify(appearance.details);
+      mergeBucket(appearance, "details", observations.details, 1);
+      changed ||= before !== JSON.stringify(appearance.details);
     }
 
     if (changed && APPEARANCE_CONFIG.includeRecent) {
       const recentLabel = buildRecentLabel(observations);
-      if (recentLabel) {
-        stateEntry.recent = uniquePush(stateEntry.recent, recentLabel, APPEARANCE_CONFIG.maxLastObservations);
-        stateEntry.lastSnippet = recentLabel;
-      }
+      if (recentLabel) appearance.recent = uniquePush(appearance.recent, recentLabel, APPEARANCE_CONFIG.maxRecentItems);
     }
 
     return changed;
   }
 
-  function scanCharacter(character, text) {
+  function scanTrackedCharacter(meta, text) {
     const segments = splitIntoSegments(text);
     let changed = false;
 
     for (const segment of segments) {
-      if (!segmentMentionsCharacter(segment, character)) continue;
+      if (!segmentMentionsCharacter(segment, meta)) continue;
       if (!shouldTreatSegmentAsAppearance(segment)) continue;
 
-      const observations = inferObservations(segment, character);
-      if (
-        !observations.outfit.length
-        && !observations.condition.length
-        && !observations.details.length
-        && !observations.clearCondition
-      ) {
-        continue;
-      }
-
-      changed = applyObservations(character, observations) || changed;
+      const observations = inferObservations(segment, meta);
+      if (!observations.outfit.length && !observations.condition.length && !observations.details.length && !observations.clearCondition) continue;
+      changed = applyObservations(meta, observations) || changed;
     }
 
-    if (changed) {
-      refreshCharacterCard(character, { allowEmpty: false });
-    }
-
+    if (changed) refreshManagedCard(meta);
     return changed;
+  }
+
+  function getLatestText() {
+    if (normalizeSpace(globalThis.text)) return globalThis.text;
+    const last = Array.isArray(globalThis.history) ? history[history.length - 1] : null;
+    return safeString(last?.text || last?.rawText);
   }
 
   function scanLatestText(text) {
     const body = normalizeSpace(text);
     if (!body) return false;
 
+    discoverCharacters(false);
+
     const root = ensureState();
     const hash = simpleHash(body);
-
-    if (root.processedTextHash === hash) {
-      return false;
-    }
+    if (root.processedTextHash === hash) return false;
     root.processedTextHash = hash;
 
     let anyChanged = false;
-    for (const character of APPEARANCE_CONFIG.characters) {
-      anyChanged = scanCharacter(character, body) || anyChanged;
+    for (const tracked of Object.values(root.tracked)) {
+      if (!tracked?.meta) continue;
+      anyChanged = scanTrackedCharacter(tracked.meta, body) || anyChanged;
     }
-
     return anyChanged;
   }
 
@@ -706,25 +774,14 @@
       resetOutfit: false,
       clearCondition: false
     };
-
     if (!note) return observations;
 
     const parts = note.split(/\s*\|\s*/);
-
     for (const part of parts) {
       const match = part.match(/^\s*(Outfit|Condition|Details?)\s*:\s*(.+)$/i);
       if (match) {
-        const bucket = /^outfit$/i.test(match[1])
-          ? "outfit"
-          : /^condition$/i.test(match[1])
-            ? "condition"
-            : "details";
-
-        const values = match[2]
-          .split(/\s*;\s*/)
-          .map(normalizeFragment)
-          .filter(Boolean);
-
+        const bucket = /^outfit$/i.test(match[1]) ? "outfit" : /^condition$/i.test(match[1]) ? "condition" : "details";
+        const values = match[2].split(/\s*;\s*/).map(normalizeFragment).filter(Boolean);
         observations[bucket].push(...values);
       } else if (/^\s*clear\s+condition\s*$/i.test(part)) {
         observations.clearCondition = true;
@@ -736,109 +793,105 @@
     observations.outfit = dedupeList(observations.outfit, APPEARANCE_CONFIG.maxFragmentsPerBucket);
     observations.condition = dedupeList(observations.condition, APPEARANCE_CONFIG.maxFragmentsPerBucket);
     observations.details = dedupeList(observations.details, 1);
-
     return observations;
   }
 
-  function refreshCharacterById(characterId) {
-    const character = configById(characterId);
-    if (!character) return false;
-    refreshCharacterCard(character, { allowEmpty: APPEARANCE_CONFIG.createEmptyCards });
-    return true;
-  }
-
-  function resetCharacter(characterId) {
+  function resetCharacter(query) {
     const root = ensureState();
-
-    if (!characterId) {
-      root.characters = {};
-      for (const character of APPEARANCE_CONFIG.characters) {
-        removeCard(character.cardTitle || `Appearance — ${character.name}`);
+    if (!query) {
+      for (const tracked of Object.values(root.tracked)) {
+        if (tracked?.meta?.cardTitle) removeManagedCard(tracked.meta.cardTitle);
       }
+      root.tracked = {};
+      root.processedTextHash = "";
+      root.discoveryHash = "";
       return true;
     }
 
-    const character = configById(characterId);
-    if (!character) return false;
-
-    delete root.characters[character.id];
-    removeCard(character.cardTitle || `Appearance — ${character.name}`);
+    const meta = resolveCharacter(query);
+    if (!meta) return false;
+    removeManagedCard(meta.cardTitle);
+    delete root.tracked[meta.id];
     return true;
   }
 
-  function clearCharacterBucket(characterId, bucket) {
-    const character = configById(characterId);
-    if (!character) return false;
+  function clearCharacterBucket(query, bucket) {
+    const meta = resolveCharacter(query);
+    if (!meta) return false;
     if (!["outfit", "condition", "details", "recent"].includes(bucket)) return false;
+    const tracked = getTrackedState(meta.id, false);
+    if (!tracked) return false;
 
-    const stateEntry = getCharacterState(character.id, false);
-    if (!stateEntry) return false;
-
-    stateEntry[bucket] = [];
-    if (bucket === "recent") stateEntry.lastSnippet = "";
-
-    if (!hasMeaningfulState(stateEntry)) {
-      removeCard(character.cardTitle || `Appearance — ${character.name}`);
-    } else {
-      refreshCharacterCard(character, { allowEmpty: false });
-    }
-
+    tracked.appearance[bucket] = [];
+    if (!hasMeaningfulAppearance(tracked.appearance)) removeManagedCard(meta.cardTitle);
+    else refreshManagedCard(meta);
     return true;
   }
 
-  function addManualNote(characterId, noteText) {
-    const character = configById(characterId);
-    if (!character) return false;
-
+  function addManualNote(query, noteText) {
+    discoverCharacters(false);
+    const meta = resolveCharacter(query);
+    if (!meta) return false;
     const observations = parseManualNote(noteText);
-    const changed = applyObservations(character, observations);
-    refreshCharacterCard(character, { allowEmpty: false });
+    applyObservations(meta, observations);
+    refreshManagedCard(meta);
+    return true;
+  }
+
+  function rescanCharacters() {
+    const changed = discoverCharacters(true);
     return changed;
   }
 
   function run(hook) {
-    if (!APPEARANCE_CONFIG.runOnHooks.includes(hook)) return;
-    scanLatestText(getLatestText());
+    if (APPEARANCE_CONFIG.discoverOnHooks.includes(hook)) discoverCharacters(false);
+    if (hook === "output") scanLatestText(getLatestText());
   }
 
   globalThis.AppearanceDirector = {
     config: APPEARANCE_CONFIG,
     run,
-    refresh(characterId) {
-      if (characterId) return refreshCharacterById(characterId);
-      refreshAllTrackedCards();
-      return true;
+    rescan() {
+      return rescanCharacters();
     },
-    reset(characterId) {
-      return resetCharacter(characterId || "");
+    refresh(query) {
+      discoverCharacters(false);
+      if (query) return refreshManagedCard(query);
+      return refreshAllManagedCards();
     },
-    clear(characterId, bucket) {
-      return clearCharacterBucket(characterId, bucket);
+    reset(query) {
+      return resetCharacter(query || "");
     },
-    note(characterId, noteText) {
-      return addManualNote(characterId, noteText);
+    clear(query, bucket) {
+      return clearCharacterBucket(query, bucket);
+    },
+    note(query, noteText) {
+      return addManualNote(query, noteText);
     },
     scan(textOverride) {
       return scanLatestText(safeString(textOverride));
     },
-    getState(characterId) {
+    getCharacters() {
+      discoverCharacters(false);
       const root = ensureState();
-      if (!characterId) return root.characters;
-      return root.characters[characterId] || null;
+      return Object.values(root.tracked).map(item => item.meta).filter(Boolean);
+    },
+    getState(query) {
+      discoverCharacters(false);
+      if (!query) return ensureState().tracked;
+      const meta = resolveCharacter(query);
+      if (!meta) return null;
+      return getTrackedState(meta.id, false);
     }
   };
 
   if (typeof globalThis.InnerSelf === "function" && !globalThis.InnerSelf.__appearanceDirectorWrapped) {
     const original = globalThis.InnerSelf;
-
     const wrapped = function(hook) {
       const result = original(hook);
-      try {
-        globalThis.AppearanceDirector.run(hook);
-      } catch (_) {}
+      try { globalThis.AppearanceDirector.run(hook); } catch (_) {}
       return result;
     };
-
     wrapped.__appearanceDirectorWrapped = true;
     globalThis.InnerSelf = wrapped;
   }
