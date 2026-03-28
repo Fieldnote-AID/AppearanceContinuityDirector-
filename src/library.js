@@ -1,19 +1,19 @@
 /* === Appearance Continuity Director ===
-   Paste near the END of library.js, below Inner Self.
-   Compatible with Questline-style wrappers.
+   Paste this in Library BELOW Inner Self (and below Questline if you use it).
 
-   WHAT IT DOES:
-   - Tracks appearance continuity for configured characters
-   - Scans latest AI output for outfit / condition / appearance changes
-   - Updates one story card per tracked character
-   - Keeps live state in state.AppearanceDirector, not in Plot Essentials / Story Summary
+   PURPOSE
+   - Tracks live appearance continuity for configured characters
+   - Updates one compact Story Card per tracked character
+   - Keeps card text small to avoid wasting Story Card context
 
-   OPTIONAL CONSOLE / SCRIPT CONTROLS:
+   MANUAL CONTROLS
    - AppearanceDirector.refresh()
-   - AppearanceDirector.reset()                  // reset all tracked characters
-   - AppearanceDirector.reset("margo")         // reset one character
-   - AppearanceDirector.note("margo", "Outfit: black silk dress. Condition: rain-soaked.")
+   - AppearanceDirector.refresh("margo")
+   - AppearanceDirector.reset()
+   - AppearanceDirector.reset("margo")
+   - AppearanceDirector.note("margo", "Outfit: black silk dress | Condition: rain-soaked | Details: barefoot")
    - AppearanceDirector.clear("margo", "condition")
+   - AppearanceDirector.scan("Margo steps in wearing a black silk dress, rain-soaked and barefoot.")
 */
 
 (function installAppearanceContinuityDirector() {
@@ -22,11 +22,19 @@
   const APPEARANCE_CONFIG = {
     stateKey: "AppearanceDirector_Characters",
     cardType: "class",
-    maxFragmentsPerBucket: 4,
-    maxLastObservations: 8,
-    maxScanWindowChars: 220,
-    runOnHooks: ["output"],
+
+    // Context safety / card size
+    createEmptyCards: false,
     pinCards: false,
+    maxFragmentsPerBucket: 2,
+    maxLastObservations: 1,
+    includeRecent: false,
+    recentLabelMax: 40,
+    maxScanWindowChars: 180,
+    maxCardChars: 260,
+
+    // Hooking
+    runOnHooks: ["output"],
 
     characters: [
       {
@@ -34,88 +42,91 @@
         name: "Seth Vaelis",
         aliases: ["Seth", "Seth Vaelis"],
         cardTitle: "Appearance — Seth Vaelis",
-        cardKeys: "Seth, Seth Vaelis, appearance, outfit, clothes"
+        cardKeys: "Seth, Seth Vaelis"
       },
       {
         id: "margo",
         name: "Margo Hanson",
         aliases: ["Margo", "Margo Hanson"],
         cardTitle: "Appearance — Margo Hanson",
-        cardKeys: "Margo, Margo Hanson, appearance, outfit, clothes"
+        cardKeys: "Margo, Margo Hanson"
       },
       {
         id: "eliot",
         name: "Eliot Waugh",
         aliases: ["Eliot", "Eliot Waugh"],
         cardTitle: "Appearance — Eliot Waugh",
-        cardKeys: "Eliot, Eliot Waugh, appearance, outfit, clothes"
+        cardKeys: "Eliot, Eliot Waugh"
       },
       {
         id: "quentin",
         name: "Quentin Coldwater",
         aliases: ["Quentin", "Quentin Coldwater", "Q"],
         cardTitle: "Appearance — Quentin Coldwater",
-        cardKeys: "Quentin, Quentin Coldwater, Q, appearance, outfit, clothes"
+        cardKeys: "Quentin, Quentin Coldwater, Q"
       },
       {
         id: "alice",
         name: "Alice Quinn",
         aliases: ["Alice", "Alice Quinn"],
         cardTitle: "Appearance — Alice Quinn",
-        cardKeys: "Alice, Alice Quinn, appearance, outfit, clothes"
+        cardKeys: "Alice, Alice Quinn"
       },
       {
         id: "penny",
         name: "Penny",
         aliases: ["Penny"],
         cardTitle: "Appearance — Penny",
-        cardKeys: "Penny, appearance, outfit, clothes"
+        cardKeys: "Penny"
       }
     ],
 
     bucketLabels: {
       outfit: "Outfit",
       condition: "Condition",
-      details: "Visible details",
-      recent: "Recent updates"
+      details: "Details",
+      recent: "Recent"
     },
 
     garmentWords: [
-      "coat", "jacket", "blazer", "suit", "shirt", "dress shirt", "tee", "t-shirt", "sweater", "cardigan", "hoodie",
-      "vest", "waistcoat", "tie", "bow tie", "scarf", "cloak", "robe", "dress", "gown", "skirt", "pants", "trousers",
-      "jeans", "leggings", "shorts", "boots", "heels", "shoes", "sneakers", "loafers", "sandals", "gloves", "stockings",
-      "corset", "bodice", "uniform", "pajamas", "pyjamas", "nightgown", "jumpsuit", "belt", "sleeves", "cuffs"
+      "coat", "jacket", "blazer", "suit", "shirt", "dress shirt", "tee", "t-shirt",
+      "sweater", "cardigan", "hoodie", "vest", "waistcoat", "tie", "bow tie", "scarf",
+      "cloak", "robe", "dress", "gown", "skirt", "pants", "trousers", "jeans",
+      "leggings", "shorts", "boots", "heels", "shoes", "sneakers", "loafers",
+      "sandals", "gloves", "stockings", "corset", "bodice", "uniform", "pajamas",
+      "pyjamas", "nightgown", "jumpsuit", "belt", "sleeves", "cuffs"
     ],
 
     accessoryWords: [
-      "ring", "rings", "necklace", "pendant", "earring", "earrings", "bracelet", "bracelets", "watch", "crown", "tiara",
-      "glasses", "spectacles", "mask", "hat", "cap", "hood", "bag", "satchel", "flask", "cane", "staff"
+      "ring", "rings", "necklace", "pendant", "earring", "earrings", "bracelet",
+      "bracelets", "watch", "crown", "tiara", "glasses", "spectacles", "mask",
+      "hat", "cap", "hood", "bag", "satchel", "flask", "cane", "staff"
     ],
 
     conditionWords: [
-      "dirty", "filthy", "muddy", "dusty", "dust-streaked", "dust coated", "bloodied", "bloody", "blood-soaked", "soaked",
-      "rain-soaked", "wet", "damp", "sweaty", "sweat-soaked", "smudged", "smeared", "stained", "wine-stained", "rumpled",
-      "wrinkled", "torn", "ripped", "singed", "burned", "charred", "soot-streaked", "ash-streaked", "bruised", "cut",
-      "scratched", "bandaged", "disheveled", "dishevelled", "unkempt", "clean", "fresh", "freshly changed"
+      "dirty", "filthy", "muddy", "dusty", "bloodied", "bloody", "blood-soaked",
+      "soaked", "rain-soaked", "wet", "damp", "sweaty", "smudged", "smeared",
+      "stained", "wine-stained", "rumpled", "wrinkled", "torn", "ripped", "singed",
+      "burned", "charred", "soot-streaked", "ash-streaked", "bruised", "cut",
+      "scratched", "bandaged", "disheveled", "dishevelled", "unkempt", "clean",
+      "fresh", "freshly changed"
     ],
 
     resetOutfitSignals: [
-      "changed into", "changes into", "now wearing", "now wears", "dressed in", "clad in", "wearing", "wears", "wore",
-      "into a fresh", "into clean", "fresh clothes", "freshly changed", "slipped into", "pulls on", "pulled on", "buttoned into"
+      "changed into", "changes into", "now wearing", "now wears", "dressed in",
+      "clad in", "fresh clothes", "freshly changed", "slipped into", "pulls on",
+      "pulled on", "buttoned into"
     ],
 
     clearConditionSignals: [
-      "washed off", "washed away", "cleaned up", "cleaned off", "changed clothes", "changed into", "showered", "bathed",
-      "scrubbed clean", "fresh clothes", "freshly changed", "no longer dirty", "clean again"
+      "washed off", "washed away", "cleaned up", "cleaned off", "changed clothes",
+      "changed into", "showered", "bathed", "scrubbed clean", "fresh clothes",
+      "freshly changed", "no longer dirty", "clean again"
     ]
   };
 
   function safeString(v) {
     return typeof v === "string" ? v : "";
-  }
-
-  function escapeRegex(text) {
-    return safeString(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   function normalizeSpace(text) {
@@ -130,6 +141,76 @@
     return normalizeSpace(text).toLowerCase();
   }
 
+  function escapeRegex(text) {
+    return safeString(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function shorten(text, max) {
+    const value = normalizeSpace(text);
+    if (!value || value.length <= max) return value;
+    return value.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
+  }
+
+  function simpleHash(text) {
+    const body = safeString(text);
+    let hash = 0;
+    for (let i = 0; i < body.length; i++) {
+      hash = ((hash << 5) - hash + body.charCodeAt(i)) | 0;
+    }
+    return String(hash);
+  }
+
+  function dedupeList(list, limit) {
+    const next = [];
+    const seen = new Set();
+
+    for (const item of Array.isArray(list) ? list : []) {
+      const clean = normalizeSpace(item);
+      if (!clean) continue;
+      const key = lower(clean);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      next.push(clean);
+      if (typeof limit === "number" && next.length >= limit) break;
+    }
+
+    return next;
+  }
+
+  function dedupeSpecific(list, limit) {
+    const sorted = dedupeList(list, 50).sort((a, b) => b.length - a.length);
+    const kept = [];
+
+    for (const item of sorted) {
+      const key = lower(item);
+      if (kept.some(existing => lower(existing).includes(key) && lower(existing) !== key)) continue;
+      kept.push(item);
+      if (typeof limit === "number" && kept.length >= limit) break;
+    }
+
+    return kept;
+  }
+
+  function compactList(list, maxItems, maxItemChars) {
+    return dedupeList(list, maxItems)
+      .slice(0, maxItems)
+      .map(item => shorten(item, maxItemChars))
+      .filter(Boolean);
+  }
+
+  function uniquePush(list, value, limit) {
+    const clean = normalizeSpace(value);
+    if (!clean) return Array.isArray(list) ? list : [];
+    const next = Array.isArray(list) ? list.slice() : [];
+    const exists = next.some(item => lower(item) === lower(clean));
+    if (!exists) next.unshift(clean);
+    return dedupeList(next, limit);
+  }
+
+  function removeListItems(list, predicate) {
+    return (Array.isArray(list) ? list : []).filter(item => !predicate(lower(item), item));
+  }
+
   function ensureCardsArray() {
     globalThis.storyCards ??= [];
     return storyCards;
@@ -139,7 +220,8 @@
     globalThis.state ??= {};
     state[APPEARANCE_CONFIG.stateKey] ??= {
       characters: {},
-      processedTextHash: ""
+      processedTextHash: "",
+      initialized: false
     };
     return state[APPEARANCE_CONFIG.stateKey];
   }
@@ -153,17 +235,35 @@
     return ensureCardsArray().find(card => lower(card?.title) === target) || null;
   }
 
+  function removeCard(title) {
+    const cards = ensureCardsArray();
+    const target = lower(title);
+    for (let i = cards.length - 1; i >= 0; i--) {
+      if (lower(cards[i]?.title) === target) {
+        cards.splice(i, 1);
+      }
+    }
+  }
+
   function upsertCard(cardConfig) {
     const cards = ensureCardsArray();
     let card = findCard(cardConfig.title);
 
     if (!card && typeof addStoryCard === "function") {
-      addStoryCard("%@%");
-      card = cards.find(c => c.title === "%@%") || null;
+      try {
+        addStoryCard("%@%");
+        card = cards.find(c => c.title === "%@%") || null;
+      } catch (_) {}
     }
 
     if (!card) {
-      card = { title: "%@%", keys: "", entry: "", description: "", type: APPEARANCE_CONFIG.cardType };
+      card = {
+        title: "%@%",
+        keys: "",
+        entry: "",
+        description: "",
+        type: APPEARANCE_CONFIG.cardType
+      };
       cards.unshift(card);
     }
 
@@ -171,7 +271,7 @@
     card.title = cardConfig.title;
     card.keys = cardConfig.keys;
     card.entry = cardConfig.entry;
-    card.description = cardConfig.description || "";
+    card.description = "";
 
     if (cardConfig.pinned) {
       const index = cards.indexOf(card);
@@ -188,58 +288,6 @@
     if (normalizeSpace(globalThis.text)) return globalThis.text;
     const last = Array.isArray(globalThis.history) ? history[history.length - 1] : null;
     return safeString(last?.text || last?.rawText);
-  }
-
-  function simpleHash(text) {
-    const body = safeString(text);
-    let hash = 0;
-    for (let i = 0; i < body.length; i++) {
-      hash = ((hash << 5) - hash + body.charCodeAt(i)) | 0;
-    }
-    return String(hash);
-  }
-
-  function uniquePush(list, value, limit) {
-    const clean = normalizeSpace(value);
-    if (!clean) return list;
-    const target = lower(clean);
-    const next = Array.isArray(list) ? list.filter(Boolean) : [];
-    if (!next.some(item => lower(item) === target)) {
-      next.unshift(clean);
-    }
-    return next.slice(0, limit);
-  }
-
-  function dedupeList(list, limit) {
-    const next = [];
-    const seen = new Set();
-    for (const item of Array.isArray(list) ? list : []) {
-      const clean = normalizeSpace(item);
-      if (!clean) continue;
-      const key = lower(clean);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      next.push(clean);
-      if (next.length >= limit) break;
-    }
-    return next;
-  }
-
-
-  function dedupeSpecific(list, limit) {
-    const sorted = dedupeList(list, 50).sort((a, b) => b.length - a.length);
-    const kept = [];
-    for (const item of sorted) {
-      const key = lower(item);
-      if (kept.some(existing => lower(existing).includes(key) && lower(existing) !== key)) continue;
-      kept.push(item);
-      if (kept.length >= limit) break;
-    }
-    return kept;
-  }
-
-  function removeListItems(list, predicate) {
-    return (Array.isArray(list) ? list : []).filter(item => !predicate(lower(item), item));
   }
 
   function splitIntoSegments(text) {
@@ -265,6 +313,10 @@
     return (Array.isArray(terms) ? terms : []).some(term => body.includes(lower(term)));
   }
 
+  function sortWordsByLength(words) {
+    return (Array.isArray(words) ? words : []).slice().sort((a, b) => b.length - a.length);
+  }
+
   function normalizeFragment(text) {
     let value = normalizeSpace(text)
       .replace(/^[,;:()\-\s]+/, "")
@@ -274,7 +326,7 @@
       .replace(/^\b(?:still|now|currently)\b\s+/i, "");
 
     if (!value) return "";
-    if (/^[a-z]$/.test(value)) return "";
+    if (/^[a-z]$/i.test(value)) return "";
     return value;
   }
 
@@ -283,41 +335,72 @@
     return (Array.isArray(words) ? words : []).some(word => body.includes(lower(word)));
   }
 
-  function sortWordsByLength(words) {
-    return (Array.isArray(words) ? words : []).slice().sort((a, b) => b.length - a.length);
+  function shouldTreatSegmentAsAppearance(segment) {
+    return (
+      hasLexiconWord(segment, APPEARANCE_CONFIG.garmentWords)
+      || hasLexiconWord(segment, APPEARANCE_CONFIG.accessoryWords)
+      || hasLexiconWord(segment, APPEARANCE_CONFIG.conditionWords)
+      || /\b(?:wearing|wears|wore|dressed|clad|changed into|looks|looked|appears|appeared|barefoot|shirtless|gloved|masked)\b/i.test(segment)
+    );
   }
 
   function extractOutfitPhrases(segment) {
     const phrases = [];
+    const body = normalizeSpace(segment);
+
+    const capturePatterns = [
+      /\b(?:wearing|wears|wore|dressed in|clad in|changed into|changes into|slipped into|pulls on|pulled on|buttoned into)\b([^.!?\n]{0,80})/gi
+    ];
+
+    for (const pattern of capturePatterns) {
+      let match;
+      while ((match = pattern.exec(body))) {
+        const clean = normalizeFragment(match[1])
+          .replace(/^(?:a|an|the)\s+/i, "")
+          .replace(/\b(?:still|now)\b\s*/gi, "")
+          .replace(/\s{2,}/g, " ")
+          .trim();
+        if (clean && hasLexiconWord(clean, APPEARANCE_CONFIG.garmentWords.concat(APPEARANCE_CONFIG.accessoryWords))) {
+          phrases.push(clean);
+        }
+      }
+    }
+
     const garmentPattern = sortWordsByLength(APPEARANCE_CONFIG.garmentWords)
       .map(escapeRegex)
       .join("|");
-    const rx = new RegExp(`(?:\\b(?:[a-zA-Z][a-zA-Z\'’\\-]*\\s+){0,4}(?:${garmentPattern})\\b(?:\\s+(?:and|,|with)\\s+(?:[a-zA-Z][a-zA-Z\'’\\-]*\\s+){0,4}(?:${garmentPattern})\\b)*)`, "gi");
+
+    const nounPhrase = new RegExp(
+      `(?:\\b(?:[a-zA-Z][a-zA-Z'’\\-]*\\s+){0,3}(?:${garmentPattern})\\b(?:\\s+(?:and|with)\\s+(?:[a-zA-Z][a-zA-Z'’\\-]*\\s+){0,3}(?:${garmentPattern})\\b)*)`,
+      "gi"
+    );
+
     let match;
-    while ((match = rx.exec(segment))) {
+    while ((match = nounPhrase.exec(body))) {
       let phrase = normalizeFragment(match[0])
         .replace(/\b(?:dirty|filthy|muddy|dusty|bloodied|bloody|blood-soaked|soaked|rain-soaked|wet|damp|sweaty|smudged|smeared|stained|wine-stained|rumpled|wrinkled|torn|ripped|singed|burned|charred|soot-streaked|ash-streaked|bruised|cut|scratched|bandaged|disheveled|dishevelled|unkempt|clean|fresh|freshly changed)\b/gi, "")
         .replace(/\s{2,}/g, " ")
-        .replace(/^\b(?:a|an|the)\b\s+/i, "")
-        .replace(/\s+(?:and|with|,)\s*$/i, "")
-        .replace(/^[A-Z][A-Za-z\'’\\-]*[\'’]s\s+/g, "")
+        .replace(/^(?:a|an|the)\s+/i, "")
         .trim();
+
       if (phrase && hasLexiconWord(phrase, APPEARANCE_CONFIG.garmentWords)) {
         phrases.push(phrase);
       }
     }
-    return dedupeList(phrases, APPEARANCE_CONFIG.maxFragmentsPerBucket);
+
+    return dedupeSpecific(phrases, APPEARANCE_CONFIG.maxFragmentsPerBucket);
   }
 
   function extractConditionPhrases(segment) {
     const phrases = [];
     const body = normalizeSpace(segment);
+
     for (const term of sortWordsByLength(APPEARANCE_CONFIG.conditionWords)) {
       const rx = new RegExp(`\\b${escapeRegex(term)}\\b`, "i");
       if (rx.test(body)) phrases.push(term);
     }
 
-    const patterned = body.match(/\b(?:blood|mud|dirt|soot|ash|wine)\s+(?:on|at|across|down)\s+[^,.;!?]{1,40}/gi) || [];
+    const patterned = body.match(/\b(?:blood|mud|dirt|soot|ash|wine)\s+(?:on|at|across|down)\s+[^,.;!?]{1,35}/gi) || [];
     phrases.push(...patterned);
 
     return dedupeSpecific(phrases.map(normalizeFragment), APPEARANCE_CONFIG.maxFragmentsPerBucket);
@@ -326,31 +409,34 @@
   function extractDetailPhrases(segment) {
     const phrases = [];
     const body = normalizeSpace(segment);
-    const matches = body.match(/\b(?:barefoot|shirtless|gloved|ungloved|masked|unmasked)\b/gi) || [];
-    phrases.push(...matches);
+
+    const direct = body.match(/\b(?:barefoot|shirtless|gloved|ungloved|masked|unmasked)\b/gi) || [];
+    phrases.push(...direct);
 
     const detailPatterns = [
-      /\b(?:hair|face|eyes|makeup|lipstick|mascara|stubble|beard|posture|stance|expression|scar|tattoo)\b[^,.;!?]{0,60}/gi,
-      /[^,.;!?]{0,30}\b(?:scar|tattoo|bruise|cut)\b[^,.;!?]{0,30}/gi
+      /\b(?:hair|face|eyes|makeup|lipstick|mascara|stubble|beard|posture|stance|expression|scar|tattoo)\b[^,.;!?]{0,40}/gi,
+      /[^,.;!?]{0,20}\b(?:scar|tattoo|bruise|cut)\b[^,.;!?]{0,20}/gi
     ];
+
     for (const pattern of detailPatterns) {
       const found = body.match(pattern) || [];
       phrases.push(...found);
     }
 
-    return dedupeList(phrases.map(normalizeFragment), APPEARANCE_CONFIG.maxFragmentsPerBucket);
+    return dedupeSpecific(phrases.map(normalizeFragment), 1);
   }
 
   function extractPatternFragments(segment, aliases) {
     const found = [];
+
     for (const alias of aliases) {
       const a = escapeRegex(alias);
       const patterns = [
-        new RegExp(`\\b${a}\\b[^.!?\\n]{0,70}\\b(?:is|was|looks|looked|appears|appeared|stands|stood|remains|seems)\\b([^.!?\\n]{0,120})`, "i"),
-        new RegExp(`\\b${a}\\b[^.!?\\n]{0,70}\\b(?:wearing|wears|wore|dressed in|clad in|now wearing|now wears|changed into|changes into|slipped into|pulls on|pulled on)\\b([^.!?\\n]{0,140})`, "i"),
-        new RegExp(`\\b${a}\\b[^.!?\\n]{0,70}\\b(?:with)\\b([^.!?\\n]{0,120})`, "i"),
-        new RegExp(`\\b${a}'s\\b([^.!?\\n]{0,140})`, "i")
+        new RegExp(`\\b${a}\\b[^.!?\\n]{0,40}\\b(?:is|was|looks|looked|appears|appeared|stands|stood|remains|seems)\\b([^.!?\\n]{0,90})`, "i"),
+        new RegExp(`\\b${a}\\b[^.!?\\n]{0,40}\\b(?:wearing|wears|wore|dressed in|clad in|now wearing|now wears|changed into|changes into|slipped into|pulls on|pulled on)\\b([^.!?\\n]{0,90})`, "i"),
+        new RegExp(`\\b${a}'s\\b([^.!?\\n]{0,90})`, "i")
       ];
+
       for (const pattern of patterns) {
         const match = segment.match(pattern);
         if (match && match[1]) {
@@ -358,53 +444,55 @@
         }
       }
     }
-    return dedupeList(found.map(normalizeFragment).filter(Boolean), 6);
+
+    return dedupeList(found.map(normalizeFragment).filter(Boolean), 4);
   }
 
   function bucketForFragment(fragment) {
     const body = lower(fragment);
 
-    if (hasLexiconWord(body, APPEARANCE_CONFIG.conditionWords)) {
-      return "condition";
-    }
-
-    if (hasLexiconWord(body, APPEARANCE_CONFIG.garmentWords) || hasLexiconWord(body, APPEARANCE_CONFIG.accessoryWords)) {
-      return "outfit";
-    }
-
-    if (
-      /\b(?:hair|face|eyes|makeup|lipstick|mascara|stubble|beard|smile|posture|stance|expression|scar|tattoo|bruise|blood at|blood on|mud on|dirt on|barefoot|shirtless)\b/i.test(fragment)
-    ) {
-      return "details";
-    }
+    if (hasLexiconWord(body, APPEARANCE_CONFIG.conditionWords)) return "condition";
+    if (hasLexiconWord(body, APPEARANCE_CONFIG.garmentWords) || hasLexiconWord(body, APPEARANCE_CONFIG.accessoryWords)) return "outfit";
+    if (/\b(?:hair|face|eyes|makeup|lipstick|mascara|stubble|beard|scar|tattoo|bruise|cut|barefoot|shirtless)\b/i.test(fragment)) return "details";
 
     return null;
   }
 
-  function shouldTreatSegmentAsAppearance(segment) {
-    return (
-      hasLexiconWord(segment, APPEARANCE_CONFIG.garmentWords)
-      || hasLexiconWord(segment, APPEARANCE_CONFIG.accessoryWords)
-      || hasLexiconWord(segment, APPEARANCE_CONFIG.conditionWords)
-      || /\b(?:wearing|wears|wore|dressed|clad|changed into|looks|looked|appears|appeared|barefoot|shirtless)\b/i.test(segment)
-    );
+  function buildRecentLabel(observations) {
+    const bits = [];
+    if (observations.outfit?.[0]) bits.push(`outfit ${shorten(observations.outfit[0], 18)}`);
+    if (observations.condition?.[0]) bits.push(shorten(observations.condition[0], 18));
+    if (observations.details?.[0]) bits.push(shorten(observations.details[0], 18));
+    return shorten(bits.join(" | "), APPEARANCE_CONFIG.recentLabelMax);
   }
 
-  function getCharacterState(characterId) {
+  function getCharacterState(characterId, create = true) {
     const root = ensureState();
-    root.characters[characterId] ??= {
-      outfit: [],
-      condition: [],
-      details: [],
-      recent: [],
-      lastSnippet: ""
-    };
-    return root.characters[characterId];
+    if (!root.characters[characterId] && create) {
+      root.characters[characterId] = {
+        outfit: [],
+        condition: [],
+        details: [],
+        recent: [],
+        lastSnippet: ""
+      };
+    }
+    return root.characters[characterId] || null;
+  }
+
+  function hasMeaningfulState(stateEntry) {
+    if (!stateEntry) return false;
+    return Boolean(
+      (stateEntry.outfit && stateEntry.outfit.length)
+      || (stateEntry.condition && stateEntry.condition.length)
+      || (stateEntry.details && stateEntry.details.length)
+      || (APPEARANCE_CONFIG.includeRecent && stateEntry.recent && stateEntry.recent.length)
+    );
   }
 
   function clearEphemeralCondition(stateEntry) {
     stateEntry.condition = removeListItems(stateEntry.condition, key => {
-      return /(dirty|filthy|muddy|dusty|dust-streaked|bloodied|bloody|blood-soaked|soaked|wet|damp|sweaty|smudged|smeared|stained|rumpled|wrinkled|torn|ripped|singed|charred|soot-streaked|ash-streaked|disheveled|dishevelled|unkempt)/i.test(key);
+      return /(dirty|filthy|muddy|dusty|bloodied|bloody|blood-soaked|soaked|wet|damp|sweaty|smudged|smeared|stained|rumpled|wrinkled|torn|ripped|singed|charred|soot-streaked|ash-streaked|disheveled|dishevelled|unkempt)/i.test(key);
     });
   }
 
@@ -420,43 +508,65 @@
     stateEntry[bucket] = dedupeList(next, APPEARANCE_CONFIG.maxFragmentsPerBucket);
   }
 
-  function buildCharacterCardEntry(character, stateEntry) {
-    const lines = [];
+  function buildCharacterCardEntry(stateEntry) {
+    const outfit = compactList(stateEntry.outfit, 2, 26);
+    const condition = compactList(stateEntry.condition, 2, 24);
+    const details = compactList(stateEntry.details, 1, 24);
+    const recent = compactList(stateEntry.recent, 1, 32);
 
-    if (stateEntry.outfit.length) {
-      lines.push(`- ${APPEARANCE_CONFIG.bucketLabels.outfit}: ${stateEntry.outfit.join("; ")}.`);
+    const sections = [
+      outfit.length ? `- ${APPEARANCE_CONFIG.bucketLabels.outfit}: ${outfit.join("; ")}.` : "",
+      condition.length ? `- ${APPEARANCE_CONFIG.bucketLabels.condition}: ${condition.join("; ")}.` : "",
+      details.length ? `- ${APPEARANCE_CONFIG.bucketLabels.details}: ${details.join("; ")}.` : "",
+      APPEARANCE_CONFIG.includeRecent && recent.length ? `- ${APPEARANCE_CONFIG.bucketLabels.recent}: ${recent[0]}.` : ""
+    ].filter(Boolean);
+
+    let entry = sections.join("\n");
+
+    if (!entry) entry = "- Appearance: no tracked changes yet.";
+
+    if (entry.length > APPEARANCE_CONFIG.maxCardChars) {
+      entry = sections.slice(0, 3).join("\n");
     }
-    if (stateEntry.condition.length) {
-      lines.push(`- ${APPEARANCE_CONFIG.bucketLabels.condition}: ${stateEntry.condition.join("; ")}.`);
+    if (entry.length > APPEARANCE_CONFIG.maxCardChars && details.length) {
+      entry = [
+        outfit.length ? `- ${APPEARANCE_CONFIG.bucketLabels.outfit}: ${outfit.join("; ")}.` : "",
+        condition.length ? `- ${APPEARANCE_CONFIG.bucketLabels.condition}: ${condition.join("; ")}.` : ""
+      ].filter(Boolean).join("\n");
     }
-    if (stateEntry.details.length) {
-      lines.push(`- ${APPEARANCE_CONFIG.bucketLabels.details}: ${stateEntry.details.join("; ")}.`);
-    }
-    if (stateEntry.recent.length) {
-      lines.push(`- ${APPEARANCE_CONFIG.bucketLabels.recent}: ${stateEntry.recent.join(" | ")}.`);
+    if (entry.length > APPEARANCE_CONFIG.maxCardChars) {
+      entry = shorten(entry, APPEARANCE_CONFIG.maxCardChars);
     }
 
-    if (!lines.length) {
-      lines.push(`- ${APPEARANCE_CONFIG.bucketLabels.recent}: no tracked appearance changes yet.`);
-    }
-
-    return lines.join("\n");
+    return entry;
   }
 
-  function refreshCharacterCard(character) {
-    const stateEntry = getCharacterState(character.id);
+  function refreshCharacterCard(character, options = {}) {
+    const { allowEmpty = APPEARANCE_CONFIG.createEmptyCards } = options;
+    const stateEntry = getCharacterState(character.id, false);
+
+    if (!stateEntry || !hasMeaningfulState(stateEntry)) {
+      if (!allowEmpty) {
+        removeCard(character.cardTitle || `Appearance — ${character.name}`);
+        return null;
+      }
+    }
+
+    const entry = stateEntry
+      ? buildCharacterCardEntry(stateEntry)
+      : "- Appearance: no tracked changes yet.";
+
     return upsertCard({
       title: character.cardTitle || `Appearance — ${character.name}`,
       keys: character.cardKeys || [character.name].concat(character.aliases || []).join(", "),
-      entry: buildCharacterCardEntry(character, stateEntry),
-      description: "Auto-managed appearance continuity card.",
+      entry,
       pinned: !!APPEARANCE_CONFIG.pinCards
     });
   }
 
-  function refreshAllCards() {
+  function refreshAllTrackedCards() {
     for (const character of APPEARANCE_CONFIG.characters) {
-      refreshCharacterCard(character);
+      refreshCharacterCard(character, { allowEmpty: false });
     }
   }
 
@@ -491,13 +601,13 @@
 
     observations.outfit = dedupeList(observations.outfit, APPEARANCE_CONFIG.maxFragmentsPerBucket);
     observations.condition = dedupeList(observations.condition, APPEARANCE_CONFIG.maxFragmentsPerBucket);
-    observations.details = dedupeList(observations.details, APPEARANCE_CONFIG.maxFragmentsPerBucket);
+    observations.details = dedupeList(observations.details, 1);
 
     return observations;
   }
 
-  function applyObservations(character, observations, snippet) {
-    const stateEntry = getCharacterState(character.id);
+  function applyObservations(character, observations) {
+    const stateEntry = getCharacterState(character.id, true);
     let changed = false;
 
     if (observations.clearCondition) {
@@ -528,10 +638,12 @@
       changed ||= (before !== JSON.stringify(stateEntry.details));
     }
 
-    const snippetText = normalizeSpace(snippet).slice(0, 150);
-    if (changed && snippetText) {
-      stateEntry.recent = uniquePush(stateEntry.recent, snippetText, APPEARANCE_CONFIG.maxLastObservations);
-      stateEntry.lastSnippet = snippetText;
+    if (changed && APPEARANCE_CONFIG.includeRecent) {
+      const recentLabel = buildRecentLabel(observations);
+      if (recentLabel) {
+        stateEntry.recent = uniquePush(stateEntry.recent, recentLabel, APPEARANCE_CONFIG.maxLastObservations);
+        stateEntry.lastSnippet = recentLabel;
+      }
     }
 
     return changed;
@@ -544,15 +656,22 @@
     for (const segment of segments) {
       if (!segmentMentionsCharacter(segment, character)) continue;
       if (!shouldTreatSegmentAsAppearance(segment)) continue;
+
       const observations = inferObservations(segment, character);
-      if (!observations.outfit.length && !observations.condition.length && !observations.details.length && !observations.clearCondition) {
+      if (
+        !observations.outfit.length
+        && !observations.condition.length
+        && !observations.details.length
+        && !observations.clearCondition
+      ) {
         continue;
       }
-      changed = applyObservations(character, observations, segment) || changed;
+
+      changed = applyObservations(character, observations) || changed;
     }
 
     if (changed) {
-      refreshCharacterCard(character);
+      refreshCharacterCard(character, { allowEmpty: false });
     }
 
     return changed;
@@ -564,6 +683,7 @@
 
     const root = ensureState();
     const hash = simpleHash(body);
+
     if (root.processedTextHash === hash) {
       return false;
     }
@@ -572,10 +692,6 @@
     let anyChanged = false;
     for (const character of APPEARANCE_CONFIG.characters) {
       anyChanged = scanCharacter(character, body) || anyChanged;
-    }
-
-    if (!anyChanged) {
-      refreshAllCards();
     }
 
     return anyChanged;
@@ -590,14 +706,25 @@
       resetOutfit: false,
       clearCondition: false
     };
+
     if (!note) return observations;
 
     const parts = note.split(/\s*\|\s*/);
+
     for (const part of parts) {
       const match = part.match(/^\s*(Outfit|Condition|Details?)\s*:\s*(.+)$/i);
       if (match) {
-        const bucket = /^outfit$/i.test(match[1]) ? "outfit" : /^condition$/i.test(match[1]) ? "condition" : "details";
-        const values = match[2].split(/\s*;\s*/).map(normalizeFragment).filter(Boolean);
+        const bucket = /^outfit$/i.test(match[1])
+          ? "outfit"
+          : /^condition$/i.test(match[1])
+            ? "condition"
+            : "details";
+
+        const values = match[2]
+          .split(/\s*;\s*/)
+          .map(normalizeFragment)
+          .filter(Boolean);
+
         observations[bucket].push(...values);
       } else if (/^\s*clear\s+condition\s*$/i.test(part)) {
         observations.clearCondition = true;
@@ -608,43 +735,64 @@
 
     observations.outfit = dedupeList(observations.outfit, APPEARANCE_CONFIG.maxFragmentsPerBucket);
     observations.condition = dedupeList(observations.condition, APPEARANCE_CONFIG.maxFragmentsPerBucket);
-    observations.details = dedupeList(observations.details, APPEARANCE_CONFIG.maxFragmentsPerBucket);
+    observations.details = dedupeList(observations.details, 1);
+
     return observations;
+  }
+
+  function refreshCharacterById(characterId) {
+    const character = configById(characterId);
+    if (!character) return false;
+    refreshCharacterCard(character, { allowEmpty: APPEARANCE_CONFIG.createEmptyCards });
+    return true;
   }
 
   function resetCharacter(characterId) {
     const root = ensureState();
+
     if (!characterId) {
       root.characters = {};
-      refreshAllCards();
+      for (const character of APPEARANCE_CONFIG.characters) {
+        removeCard(character.cardTitle || `Appearance — ${character.name}`);
+      }
       return true;
     }
+
     const character = configById(characterId);
     if (!character) return false;
+
     delete root.characters[character.id];
-    refreshCharacterCard(character);
+    removeCard(character.cardTitle || `Appearance — ${character.name}`);
     return true;
   }
 
   function clearCharacterBucket(characterId, bucket) {
     const character = configById(characterId);
     if (!character) return false;
-    const stateEntry = getCharacterState(character.id);
     if (!["outfit", "condition", "details", "recent"].includes(bucket)) return false;
+
+    const stateEntry = getCharacterState(character.id, false);
+    if (!stateEntry) return false;
+
     stateEntry[bucket] = [];
-    if (bucket === "recent") {
-      stateEntry.lastSnippet = "";
+    if (bucket === "recent") stateEntry.lastSnippet = "";
+
+    if (!hasMeaningfulState(stateEntry)) {
+      removeCard(character.cardTitle || `Appearance — ${character.name}`);
+    } else {
+      refreshCharacterCard(character, { allowEmpty: false });
     }
-    refreshCharacterCard(character);
+
     return true;
   }
 
   function addManualNote(characterId, noteText) {
     const character = configById(characterId);
     if (!character) return false;
+
     const observations = parseManualNote(noteText);
-    const changed = applyObservations(character, observations, `Manual note: ${noteText}`);
-    refreshCharacterCard(character);
+    const changed = applyObservations(character, observations);
+    refreshCharacterCard(character, { allowEmpty: false });
     return changed;
   }
 
@@ -656,8 +804,10 @@
   globalThis.AppearanceDirector = {
     config: APPEARANCE_CONFIG,
     run,
-    refresh() {
-      refreshAllCards();
+    refresh(characterId) {
+      if (characterId) return refreshCharacterById(characterId);
+      refreshAllTrackedCards();
+      return true;
     },
     reset(characterId) {
       return resetCharacter(characterId || "");
@@ -670,11 +820,17 @@
     },
     scan(textOverride) {
       return scanLatestText(safeString(textOverride));
+    },
+    getState(characterId) {
+      const root = ensureState();
+      if (!characterId) return root.characters;
+      return root.characters[characterId] || null;
     }
   };
 
   if (typeof globalThis.InnerSelf === "function" && !globalThis.InnerSelf.__appearanceDirectorWrapped) {
     const original = globalThis.InnerSelf;
+
     const wrapped = function(hook) {
       const result = original(hook);
       try {
@@ -682,11 +838,8 @@
       } catch (_) {}
       return result;
     };
+
     wrapped.__appearanceDirectorWrapped = true;
     globalThis.InnerSelf = wrapped;
-  } else if (typeof globalThis.InnerSelf !== "function") {
-    try {
-      globalThis.AppearanceDirector.refresh();
-    } catch (_) {}
   }
 })();
