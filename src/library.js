@@ -18,6 +18,9 @@
     maxRecentItems: 1,
     recentLabelMax: 40,
 
+    commandPrefix: "/",
+    enableInputCommands: true,
+
     ignoreAliases: [
       "appearance", "outfit", "outfits", "clothes", "clothing", "look", "looks", "looking",
       "character", "npc", "person", "people", "world", "location", "quest", "objective",
@@ -986,11 +989,52 @@
     return true;
   }
 
+  function parseInputCommand(rawText) {
+    var text = normalizeSpace(rawText);
+    var match;
+    var name;
+    var payload;
+
+    if (!APPEARANCE_CONFIG.enableInputCommands) return false;
+    if (!text || text.charAt(0) !== APPEARANCE_CONFIG.commandPrefix) return false;
+
+    match = text.match(/^\/(outfit|condition|details)\s+([^:]+):\s*(.+)$/i);
+    if (match) {
+      name = normalizeSpace(match[2]);
+      payload = match[1] + ": " + normalizeSpace(match[3]);
+      return addManualNote(name, payload);
+    }
+
+    match = text.match(/^\/appearance\s+([^:]+):\s*(.+)$/i);
+    if (match) {
+      name = normalizeSpace(match[1]);
+      payload = normalizeSpace(match[2]);
+      return addManualNote(name, payload);
+    }
+
+    match = text.match(/^\/clearappearance\s+([^:]+):\s*(outfit|condition|details|recent)$/i);
+    if (match) {
+      return clearCharacterBucket(normalizeSpace(match[1]), lower(match[2]));
+    }
+
+    match = text.match(/^\/resetappearance\s+(.+)$/i);
+    if (match) {
+      return resetCharacter(normalizeSpace(match[1]));
+    }
+
+    return false;
+  }
+
   function rescanCharacters() {
     return refreshTrackedRegistry(true);
   }
 
   function run(hook) {
+    if (hook === "input") {
+      parseInputCommand(safeString(globalThis.text));
+      return;
+    }
+
     if (hook === "output") {
       refreshTrackedRegistry(false);
       scanLatestText(getLatestText());
