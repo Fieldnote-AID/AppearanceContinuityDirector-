@@ -219,7 +219,7 @@ Your scenario should already have Inner Self installed.
 Your tabs should already look something like this:
 
 #### Input
-```javascript
+
 InnerSelf("input");
 const modifier = (text) => {
   return { text };
