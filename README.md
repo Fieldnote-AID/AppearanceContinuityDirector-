@@ -1,7 +1,7 @@
-# Appearance Continuity Director 
+# Appearance Continuity Director
 ### Automated appearance tracking for AI Dungeon
 
-Appearance Continuity Director is a plug-in continuity script for AI Dungeon. It tracks visible character state from story output and keeps that state updated through script-managed Story Cards.
+Appearance Continuity Director is a plug-in continuity script for AI Dungeon. It tracks live visible character state from story output and keeps that state updated through compact, script-managed Story Cards.
 
 Instead of manually editing cards every time a character changes clothes, gets soaked, ends up bloodied, cleans up, or picks up some new visible detail, this script handles those updates for you.
 
@@ -26,8 +26,8 @@ It automatically:
 
 * tracks appearance updates for configured characters
 * scans latest AI-generated output for outfit and condition changes
-* updates one Story Card per tracked character
-* preserves recent appearance observations
+* updates one compact Story Card per tracked character
+* keeps appearance cards lean to avoid wasting Story Card budget
 * reduces manual continuity maintenance during long adventures
 
 It is especially useful when you want:
@@ -67,6 +67,9 @@ Detects when a tracked character’s outfit, condition, or visible details chang
 * **Per-character appearance cards**  
 Maintains one Story Card per tracked character instead of creating lots of fragmented cards.
 
+* **Compact card output**  
+Keeps card text short so appearance continuity does not bloat Story Card context.
+
 * **Condition persistence**  
 Carries forward things like dirt, blood, soot, wet clothes, or torn clothing until the story signals cleanup or a clothing change.
 
@@ -98,7 +101,7 @@ Each turn, it:
    * condition
    * visible details
 5. updates the tracked state for that character
-6. refreshes that character’s appearance Story Card
+6. refreshes that character’s appearance Story Card only if something changed
 
 This means the AI keeps seeing current appearance continuity without you manually editing cards every scene.
 
@@ -220,21 +223,9 @@ Your tabs should already look something like this:
 
 #### Input
 
+```javascript
 InnerSelf("input");
 const modifier = (text) => {
   return { text };
 };
 modifier(text);
-* * *
-
-## Examples / How It Works
-
-Appearance Continuity Director watches the latest AI output for configured character names and appearance-related language.
-
-When it sees a tracked change, it updates that character’s appearance Story Card.
-
-### Example: automatic outfit tracking
-
-Story output:
-```text
-Margo steps into the penthouse still wearing a black silk dress and silver heels.
