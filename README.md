@@ -225,3 +225,16 @@ const modifier = (text) => {
   return { text };
 };
 modifier(text);
+* * *
+
+## Examples / How It Works
+
+Appearance Continuity Director watches the latest AI output for configured character names and appearance-related language.
+
+When it sees a tracked change, it updates that character’s appearance Story Card.
+
+### Example: automatic outfit tracking
+
+Story output:
+```text
+Margo steps into the penthouse still wearing a black silk dress and silver heels.
