@@ -1,4 +1,4 @@
-# AppearanceTracke Continuity Director
+# Appearance Continuity Director 
 ### Automated appearance tracking for AI Dungeon
 
 Appearance Continuity Director is a plug-in continuity script for AI Dungeon. It tracks visible character state from story output and keeps that state updated through script-managed Story Cards.
